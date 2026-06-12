@@ -1,73 +1,54 @@
-"""海龟交易策略：20日新高突破 + 成交额过亿 + 动量阳线过滤。"""
+"""海龟交易策略：20日新高突破 + 成交额过亿 + 动量阳线过滤 + 基本面筛选。"""
+
+import sqlite3
 
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
+from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
 
 
 class TurtleTradeStrategy(BaseStrategy):
-    """海龟交易策略（A股防诱多改良版）。
+    """海龟交易策略（A股防诱多改良版 + Tushare 基本面增强）。
 
     选股条件（向量化，严禁 iterrows）：
     1. 突破新高：今日 close > 前20个交易日 high 的最大值
     2. 流动性：今日 turnover > 100,000,000
     3. 防诱多过滤：今日必须是实体阳线（今日 close > 今日 open），且必须真涨（今日 close > 昨日 close）
+    4. 基本面过滤：排除 ST、市值≥10亿、PE 0~300
 
     Attributes:
         webhook_key: 路由到 'turtle' 专属飞书机器人。
     """
 
     webhook_key: str = "turtle"
+    name_cn: str = "海龟突破"
     _MIN_BARS: int = 21  # 至少需要 21 根 K 线（20日窗口 + 当日）
 
-    def _get_market_caps(self, symbols: list[str]) -> dict[str, float]:
-        """通过 baostock 查询候选股票的流通市值（不复权收盘价 × 流通股本）。
-
-        流通股本 = 成交量 / (换手率% / 100)
-        流通市值 = 流通股本 × 不复权收盘价
-        """
-        from datetime import date
-
-        import baostock as bs
-
-        today_str = date.today().strftime("%Y-%m-%d")
-        market_caps: dict[str, float] = {}
-
-        bs.login()
+    def _get_market_caps_from_db(self, symbols: list[str]) -> dict[str, float]:
+        """从本地 daily_basic 表查询流通市值。"""
+        if not symbols:
+            return {}
+        placeholders = ",".join("?" * len(symbols))
         try:
-            for symbol in symbols:
-                bs_code = self.engine._to_baostock_code(symbol)
-                rs = bs.query_history_k_data_plus(
-                    bs_code,
-                    "close,volume,turn",
-                    start_date=today_str,
-                    end_date=today_str,
-                    frequency="d",
-                    adjustflag="3",  # 不复权，真实价格
-                )
-                while rs.next():
-                    row = rs.get_row_data()
-                    try:
-                        close = float(row[0])
-                        volume = float(row[1])
-                        turn = float(row[2])
-                        if turn > 0:
-                            circulating_shares = volume / (turn / 100)
-                            market_caps[symbol] = circulating_shares * close
-                    except (ValueError, ZeroDivisionError):
-                        continue
-        finally:
-            bs.logout()
-
-        return market_caps
+            with sqlite3.connect(self.engine.db_path) as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT symbol, circ_mv FROM daily_basic
+                    WHERE symbol IN ({placeholders})
+                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
+                    """,
+                    symbols,
+                ).fetchall()
+            return {r[0]: r[1] or 0 for r in rows}
+        except Exception:
+            return {}
 
     def run(self) -> list[str]:
-        """
-        遍历全市场，返回满足海龟突破条件的股票代码列表。
-        """
+        """遍历全市场，返回满足海龟突破条件的股票代码列表。"""
         symbols = self.engine.get_local_symbols()
         candidates: list[str] = []
 
@@ -90,10 +71,9 @@ class TurtleTradeStrategy(BaseStrategy):
                 breakout = last["close"] > last["high_20"]
                 # 核心条件 2：流动性过亿
                 liquid = last["turnover"] > 100_000_000
-
-                # 【新增防守条件】拒绝郑州煤电式的高开低走大阴线！
-                is_yang = last["close"] > last["open"]   # 实体必须是阳线（红柱）
-                is_up = last["close"] > prev["close"]    # 必须是真涨，不能是假阳线
+                # 防诱多过滤：实体阳线 + 真涨
+                is_yang = last["close"] > last["open"]
+                is_up = last["close"] > prev["close"]
 
                 if breakout and liquid and is_yang and is_up:
                     candidates.append(symbol)
@@ -102,9 +82,14 @@ class TurtleTradeStrategy(BaseStrategy):
                 logger.warning(f"[{symbol}] TurtleTradeStrategy 计算失败：{exc}")
                 continue
 
-        # 按流通市值从大到小排序
+        # 基本面前置过滤
+        if candidates and self.engine.tushare:
+            f_filter = FundamentalFilter(self.engine)
+            candidates = f_filter.apply_defaults(candidates)
+
+        # 按流通市值从大到小排序（从本地 DB）
         if candidates:
-            market_caps = self._get_market_caps(candidates)
+            market_caps = self._get_market_caps_from_db(candidates)
             candidates.sort(key=lambda s: market_caps.get(s, 0), reverse=True)
 
         logger.info(f"TurtleTradeStrategy 选出 {len(candidates)} 只股票")

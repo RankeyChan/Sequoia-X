@@ -21,6 +21,7 @@ class PrivatePlacementStrategy(BaseStrategy):
     """
 
     webhook_key: str = "private_placement"
+    name_cn: str = "定增公告"
     _LOOKBACK_DAYS: int = 7  # 回看天数，覆盖一周内的新公告
 
     def run(self) -> list[str]:

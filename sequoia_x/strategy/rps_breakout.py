@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 from sequoia_x.strategy.base import BaseStrategy
+from sequoia_x.strategy.filters import FundamentalFilter
 from sequoia_x.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -10,6 +11,7 @@ class RpsBreakoutStrategy(BaseStrategy):
     """RPS 极强动量突破策略"""
 
     webhook_key: str = "rps"
+    name_cn: str = "RPS突破"
     rps_period: int = 120
     rps_threshold: int = 90
 
@@ -24,7 +26,7 @@ class RpsBreakoutStrategy(BaseStrategy):
         if df.empty:
             return []
 
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], format='mixed')
         df = df.sort_values(['symbol', 'date'])
 
         # 纵向计算涨幅
@@ -52,5 +54,12 @@ class RpsBreakoutStrategy(BaseStrategy):
         breakout_condition = strong_stocks['close'] >= strong_stocks['roll_high'] * 0.90
         selected = strong_stocks[breakout_condition]
 
-        logger.info(f"RpsBreakoutStrategy 选出 {len(selected)} 只股票")
-        return selected['symbol'].tolist()
+        symbols = selected['symbol'].tolist()
+
+        # 基本面前置过滤
+        if symbols and self.engine.tushare:
+            f_filter = FundamentalFilter(self.engine)
+            symbols = f_filter.apply_defaults(symbols)
+
+        logger.info(f"RpsBreakoutStrategy 选出 {len(symbols)} 只股票")
+        return symbols

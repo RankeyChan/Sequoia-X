@@ -13,11 +13,11 @@ class BaseStrategy(ABC):
 
     Attributes:
         webhook_key: 策略对应的飞书 webhook 标识，用于路由到不同机器人。
-            默认为 'default'，将使用 Settings.feishu_webhook_url。
-            子类可覆盖此属性以路由到专属机器人，例如 'ma_volume'。
+        name_cn: 策略中文名称，用于飞书推送显示。
     """
 
     webhook_key: str = "default"
+    name_cn: str = ""
 
     def __init__(self, engine: DataEngine, settings: Settings) -> None:
         """

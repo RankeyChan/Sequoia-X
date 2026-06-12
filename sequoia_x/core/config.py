@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     feishu_webhook_url: str  # 必填字段，缺失时抛出 ValidationError
     strategy_webhooks: dict[str, str] = {}
 
+    # ── Tushare 配置 ──
+    # ── Tushare 配置（唯一数据源）──
+    tushare_token: str = ""         # Tushare API token（必填）
+    tushare_proxy_url: str = ""     # 代理地址，如 http://8.148.76.181:8686/
+    tushare_max_workers: int = 5    # API 最大并发数
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

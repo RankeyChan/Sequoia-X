@@ -4,6 +4,7 @@ import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
+from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ class HighTightFlagStrategy(BaseStrategy):
     """
 
     webhook_key: str = "flag"
+    name_cn: str = "高窄旗形"
     _MIN_BARS: int = 40  # 至少需要 40 根 K 线
 
     def run(self) -> list[str]:
@@ -67,6 +69,11 @@ class HighTightFlagStrategy(BaseStrategy):
             except Exception as exc:
                 logger.warning(f"[{symbol}] HighTightFlagStrategy 计算失败：{exc}")
                 continue
+
+        # 基本面前置过滤
+        if selected and self.engine.tushare:
+            f_filter = FundamentalFilter(self.engine)
+            selected = f_filter.apply_defaults(selected)
 
         logger.info(f"HighTightFlagStrategy 选出 {len(selected)} 只股票")
         return selected

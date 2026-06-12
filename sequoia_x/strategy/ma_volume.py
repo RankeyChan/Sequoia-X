@@ -4,6 +4,7 @@ import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
+from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
 
@@ -20,6 +21,7 @@ class MaVolumeStrategy(BaseStrategy):
     """
 
     webhook_key: str = "ma_volume"
+    name_cn: str = "均线放量"
 
     def run(self) -> list[str]:
         """
@@ -58,6 +60,11 @@ class MaVolumeStrategy(BaseStrategy):
             except Exception as exc:
                 logger.warning(f"[{symbol}] 策略计算失败：{exc}")
                 continue
+
+        # 基本面前置过滤
+        if selected and self.engine.tushare:
+            f_filter = FundamentalFilter(self.engine)
+            selected = f_filter.apply_defaults(selected)
 
         logger.info(f"MaVolumeStrategy 选出 {len(selected)} 只股票")
         return selected
