@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Optional
 import pymysql
 import pandas as pd
 
@@ -30,6 +31,7 @@ class MySQLEngine:
             "charset": "utf8mb4",
             "autocommit": True,
         }
+        self._sqlalchemy_engine: object | None = None  # cached engine with pool
         self.target_date: str = ""
         self._init_db()
         self.tushare: TushareProvider | None = None
@@ -246,8 +248,49 @@ class MySQLEngine:
 
     # ── 股票数据读取 ──
 
+    _ohlcv_cache: dict[str, "pd.DataFrame"] | None = None  # class-level cache, reset per run
+
     def get_ohlcv(self, symbol: str) -> pd.DataFrame:
-        """获取单只股票日K线数据。"""
+        """获取单只股票日K线数据（内置批量缓存）。
+
+        首次调用时一次性加载全市场 K 线到内存，
+        后续调用直接从缓存字典返回，避免逐条 DB 往返。
+        """
+        if MySQLEngine._ohlcv_cache is None:
+            self._preload_ohlcv_cache()
+        cache = MySQLEngine._ohlcv_cache or {}
+        # 按 ts_code 精确匹配（symbol 可能是纯数字，ts_code 带后缀）
+        for ts_code, df in cache.items():
+            if ts_code.startswith(symbol):
+                return df.copy()
+        # Fallback: 缓存中未找到时单独查询
+        return self._get_ohlcv_direct(symbol)
+
+    def _preload_ohlcv_cache(self) -> None:
+        """预加载全市场 OHLCV 到类级缓存。"""
+        cols = "ts_code, trade_date, open, high, low, close, pre_close, `change`, pct_chg, vol, amount"
+        eng = self._get_sqlalchemy_engine()
+        if self.target_date:
+            sql = f"SELECT {cols} FROM ts_daily WHERE trade_date <= '{self.target_date}' ORDER BY ts_code, trade_date"
+        else:
+            sql = f"SELECT {cols} FROM ts_daily ORDER BY ts_code, trade_date"
+        df = pd.read_sql(sql, eng)
+        if df.empty:
+            MySQLEngine._ohlcv_cache = {}
+            return
+        # 标准化列名
+        if "vol" in df.columns:
+            df = df.rename(columns={"vol": "volume", "trade_date": "date"})
+        if "amount" in df.columns and "turnover" not in df.columns:
+            df = df.rename(columns={"amount": "turnover"})
+        cache: dict[str, "pd.DataFrame"] = {}
+        for code, group in df.groupby("ts_code"):
+            cache[code] = group.reset_index(drop=True)
+        MySQLEngine._ohlcv_cache = cache
+        logger.info(f"OHLCV 缓存预加载完成: {len(cache)} 只股票")
+
+    def _get_ohlcv_direct(self, symbol: str) -> pd.DataFrame:
+        """直接查询单只股票 K 线（缓存未命中时的降级路径）。"""
         cols = "ts_code, trade_date, open, high, low, close, pre_close, `change`, pct_chg, vol, amount"
         eng = self._get_sqlalchemy_engine()
         if self.target_date:
@@ -260,18 +303,70 @@ class MySQLEngine:
                 f"SELECT {cols} FROM ts_daily WHERE ts_code LIKE %s ORDER BY trade_date",
                 eng, params=(f"{symbol}%",),
             )
-        # 重命名列以兼容策略层
         if "vol" in df.columns:
             df = df.rename(columns={"vol": "volume", "trade_date": "date"})
         if "amount" in df.columns and "turnover" not in df.columns:
             df = df.rename(columns={"amount": "turnover"})
         return df
 
-    def _get_sqlalchemy_engine(self):
-        """获取 SQLAlchemy engine（用于 pandas read_sql）。"""
+    def get_all_ohlcv(self, symbols: list[str] | None = None) -> dict[str, 'pd.DataFrame']:
+        """批量获取全市场 OHLCV 数据（单次 SQL 查询）。
+
+        避免 per-symbol 逐条查询，将 ~5000 次 DB 往返降为 1 次。
+        返回 {ts_code: DataFrame}，DataFrame 已按 trade_date 排序且列名已标准化。
+
+        Args:
+            symbols: 可选，指定股票代码列表；默认查询全市场。
+        """
+        eng = self._get_sqlalchemy_engine()
+        cols = "ts_code, trade_date, open, high, low, close, pre_close, `change`, pct_chg, vol, amount"
+        if symbols:
+            placeholders = ",".join([f"'{s}%'" for s in symbols])
+            where = f"WHERE ts_code IN ({placeholders})"
+        else:
+            where = ""
+        if self.target_date:
+            date_filter = f"{'AND' if where else 'WHERE'} trade_date <= '{self.target_date}'"
+        else:
+            date_filter = ""
+        sql = f"SELECT {cols} FROM ts_daily {where} {date_filter} ORDER BY ts_code, trade_date"
+        df = pd.read_sql(sql, eng)
+        if df.empty:
+            return {}
+        # 标准化列名
+        if "vol" in df.columns:
+            df = df.rename(columns={"vol": "volume", "trade_date": "date"})
+        if "amount" in df.columns and "turnover" not in df.columns:
+            df = df.rename(columns={"amount": "turnover"})
+        # 按 ts_code 分组返回
+        result: dict[str, pd.DataFrame] = {}
+        for code, group in df.groupby("ts_code"):
+            result[code] = group.reset_index(drop=True)
+        return result
+
+    @staticmethod
+    def _limit_bars_per_symbol(df_map: dict[str, 'pd.DataFrame'], n: int = 300) -> dict[str, 'pd.DataFrame']:
+        """每个 symbol 只保留最近 n 根 K 线，减少内存和计算量。"""
+        return {k: v.tail(n) for k, v in df_map.items()}
+
+    def _get_sqlalchemy_engine(self) -> object:
+        """获取缓存的 SQLAlchemy engine（用于 pandas read_sql）。
+
+        首次调用时创建带连接池的 engine，后续复用。
+        避免每次查询都重建 engine 的开销。
+        """
+        if self._sqlalchemy_engine is not None:
+            return self._sqlalchemy_engine
         from sqlalchemy import create_engine
         url = f"mysql+pymysql://{self.settings.mysql_user}:{self.settings.mysql_password}@{self.settings.mysql_host}:{self.settings.mysql_port}/{self.settings.mysql_database}?charset=utf8mb4"
-        return create_engine(url)
+        self._sqlalchemy_engine = create_engine(
+            url,
+            pool_size=10,
+            max_overflow=20,
+            pool_recycle=3600,
+            pool_pre_ping=True,
+        )
+        return self._sqlalchemy_engine
 
     def get_local_symbols(self) -> list[str]:
         """获取数据库中已有K线的股票代码列表。"""
@@ -286,64 +381,76 @@ class MySQLEngine:
     # ── 元数据查询 ──
 
     def get_stock_names(self, symbols: list[str]) -> dict[str, str]:
-        """批量查询股票名称。"""
+        """批量查询股票名称（单次 SQL 查询，避免 N 次往返）。"""
         if not symbols:
             return {}
+        result: dict[str, str] = {s: "" for s in symbols}
+        placeholders = ",".join(["%s"] * len(symbols))
         conn = self._get_conn()
         try:
-            result: dict[str, str] = {}
-            for s in symbols:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT name FROM ts_stock_basic WHERE ts_code LIKE %s LIMIT 1",
-                        (f"{s}%",),
-                    )
-                    row = cur.fetchone()
-                    result[s] = row[0] if row else ""
-            return result
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT ts_code, name FROM ts_stock_basic WHERE ts_code IN ({placeholders})",
+                    symbols,
+                )
+                for row in cur.fetchall():
+                    result[row[0]] = row[1] or ""
         finally:
             conn.close()
+        return result
 
     def get_stock_meta_batch(self, symbols: list[str]) -> dict[str, dict[str, object]]:
-        """批量获取股票元数据（名称、行业、PE、市值、资金流向）。"""
+        """批量获取股票元数据（名称、行业、PE、市值、资金流向）。
+        
+        优化为 3 次批量查询（而非每只股票 3 次查询）。
+        """
         if not symbols:
             return {}
+        result: dict[str, dict[str, object]] = {
+            s: {"symbol": s, "name": "", "industry": "",
+                "pe_ttm": None, "circ_mv": None, "net_mf_amount": None}
+            for s in symbols
+        }
+        placeholders = ",".join(["%s"] * len(symbols))
         conn = self._get_conn()
-        result: dict[str, dict[str, object]] = {}
         try:
-            for s in symbols:
-                meta: dict[str, object] = {
-                    "symbol": s, "name": "", "industry": "",
-                    "pe_ttm": None, "circ_mv": None, "net_mf_amount": None,
-                }
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT name, industry FROM ts_stock_basic WHERE ts_code LIKE %s LIMIT 1",
-                        (f"{s}%",),
-                    )
-                    row = cur.fetchone()
-                    if row:
-                        meta["name"] = row[0] or ""
-                        meta["industry"] = row[1] or ""
+            with conn.cursor() as cur:
+                # 查询 1：股票名称 + 行业
+                cur.execute(
+                    f"SELECT ts_code, name, industry FROM ts_stock_basic WHERE ts_code IN ({placeholders})",
+                    symbols,
+                )
+                for row in cur.fetchall():
+                    if row[0] in result:
+                        result[row[0]]["name"] = row[1] or ""
+                        result[row[0]]["industry"] = row[2] or ""
 
-                    cur.execute(
-                        "SELECT pe_ttm, circ_mv FROM ts_daily_basic WHERE ts_code LIKE %s ORDER BY trade_date DESC LIMIT 1",
-                        (f"{s}%",),
-                    )
-                    row = cur.fetchone()
-                    if row:
-                        meta["pe_ttm"] = row[0]
-                        meta["circ_mv"] = row[1]
+                # 查询 2：最新 PE + 流通市值（窗口函数取每个 ts_code 最新一条）
+                cur.execute(
+                    f"""SELECT ts_code, pe_ttm, circ_mv FROM (
+                        SELECT ts_code, pe_ttm, circ_mv,
+                            ROW_NUMBER() OVER (PARTITION BY ts_code ORDER BY trade_date DESC) AS rn
+                        FROM ts_daily_basic WHERE ts_code IN ({placeholders})
+                    ) t WHERE rn = 1""",
+                    symbols,
+                )
+                for row in cur.fetchall():
+                    if row[0] in result:
+                        result[row[0]]["pe_ttm"] = row[1]
+                        result[row[0]]["circ_mv"] = row[2]
 
-                    cur.execute(
-                        "SELECT net_mf_amount FROM ts_moneyflow WHERE ts_code LIKE %s ORDER BY trade_date DESC LIMIT 1",
-                        (f"{s}%",),
-                    )
-                    row = cur.fetchone()
-                    if row:
-                        meta["net_mf_amount"] = row[0]
-
-                result[s] = meta
+                # 查询 3：最新资金流向
+                cur.execute(
+                    f"""SELECT ts_code, net_mf_amount FROM (
+                        SELECT ts_code, net_mf_amount,
+                            ROW_NUMBER() OVER (PARTITION BY ts_code ORDER BY trade_date DESC) AS rn
+                        FROM ts_moneyflow WHERE ts_code IN ({placeholders})
+                    ) t WHERE rn = 1""",
+                    symbols,
+                )
+                for row in cur.fetchall():
+                    if row[0] in result:
+                        result[row[0]]["net_mf_amount"] = row[1]
         finally:
             conn.close()
         return result

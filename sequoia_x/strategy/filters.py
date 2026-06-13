@@ -37,59 +37,27 @@ class FundamentalFilter:
         except Exception:
             return {}
 
-    def _get_pb_map(self, symbols: list[str]) -> dict[str, float]:
-        """获取最新 PB。"""
+    def _get_daily_basic_batch(self, symbols: list[str]) -> dict[str, dict[str, float]]:
+        """获取最新 PB / 流通市值 / 换手率（合并为 1 次 SQL 查询）。"""
         if not symbols:
-            return {}
+            return {"pb": {}, "cap": {}, "turn": {}}
         placeholders = ",".join(["%s"] * len(symbols))
         try:
-            rows = self.engine.fetch_all(
-                f"""
-                SELECT ts_code, pb FROM ts_daily_basic
-                WHERE ts_code IN ({placeholders})
-                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
-                """,
+            all_rows = self.engine.fetch_all(
+                f"""SELECT ts_code, pb, circ_mv, turnover_rate FROM (
+                    SELECT ts_code, pb, circ_mv, turnover_rate,
+                        ROW_NUMBER() OVER (PARTITION BY ts_code ORDER BY trade_date DESC) AS rn
+                    FROM ts_daily_basic WHERE ts_code IN ({placeholders})
+                ) t WHERE rn = 1""",
                 symbols,
             )
-            return {r[0]: r[1] or 0 for r in rows}
+            return {
+                "pb": {r[0]: r[1] or 0 for r in all_rows},
+                "cap": {r[0]: r[2] or 0 for r in all_rows},
+                "turn": {r[0]: r[3] or 0 for r in all_rows},
+            }
         except Exception:
-            return {}
-
-    def _get_market_cap_map(self, symbols: list[str]) -> dict[str, float]:
-        """获取最新流通市值。"""
-        if not symbols:
-            return {}
-        placeholders = ",".join(["%s"] * len(symbols))
-        try:
-            rows = self.engine.fetch_all(
-                f"""
-                SELECT ts_code, circ_mv FROM ts_daily_basic
-                WHERE ts_code IN ({placeholders})
-                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
-                """,
-                symbols,
-            )
-            return {r[0]: r[1] or 0 for r in rows}
-        except Exception:
-            return {}
-
-    def _get_turnover_map(self, symbols: list[str]) -> dict[str, float]:
-        """获取最新换手率。"""
-        if not symbols:
-            return {}
-        placeholders = ",".join(["%s"] * len(symbols))
-        try:
-            rows = self.engine.fetch_all(
-                f"""
-                SELECT ts_code, turnover_rate FROM ts_daily_basic
-                WHERE ts_code IN ({placeholders})
-                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
-                """,
-                symbols,
-            )
-            return {r[0]: r[1] or 0 for r in rows}
-        except Exception:
-            return {}
+            return {"pb": {}, "cap": {}, "turn": {}}
 
     def _get_st_stocks(self) -> set[str]:
         """获取当前 ST 股票列表。"""
@@ -118,7 +86,7 @@ class FundamentalFilter:
 
     def filter_by_pb(self, symbols: list[str], max_pb: float = 10) -> list[str]:
         """按 PB 过滤。"""
-        pb_map = self._get_pb_map(symbols)
+        pb_map = self._get_daily_basic_batch(symbols)["pb"]
         result = [
             s for s in symbols
             if s in pb_map and 0 < pb_map[s] < max_pb
@@ -130,7 +98,7 @@ class FundamentalFilter:
         self, symbols: list[str], min_cap: float = 10e8
     ) -> list[str]:
         """按流通市值过滤（默认最小 10 亿）。"""
-        cap_map = self._get_market_cap_map(symbols)
+        cap_map = self._get_daily_basic_batch(symbols)["cap"]
         result = [s for s in symbols if s in cap_map and cap_map[s] >= min_cap]
         logger.info(f"市值过滤: {len(symbols)} -> {len(result)} (≥{min_cap / 1e8:.0f}亿)")
         return result
@@ -139,7 +107,7 @@ class FundamentalFilter:
         self, symbols: list[str], min_rate: float = 2.0
     ) -> list[str]:
         """按换手率过滤（默认最小 2%）。"""
-        turn_map = self._get_turnover_map(symbols)
+        turn_map = self._get_daily_basic_batch(symbols)["turn"]
         result = [s for s in symbols if s in turn_map and turn_map[s] >= min_rate]
         logger.info(f"换手率过滤: {len(symbols)} -> {len(result)} (≥{min_rate}%)")
         return result

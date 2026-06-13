@@ -35,6 +35,7 @@ class FeishuNotifier:
         self.settings = settings
         self.engine = engine
         self.trade_date = trade_date or date.today().strftime("%Y%m%d")
+        self._market_overview_cache: str | None = None  # 缓存，一次 API 调用
 
     @staticmethod
     def _to_xueqiu_code(code: str) -> str:
@@ -52,12 +53,17 @@ class FeishuNotifier:
         return {}
 
     def _build_market_overview(self) -> str:
-        """构建市场概览文本。"""
+        """构建市场概览文本（缓存 Tushare API 调用）。"""
+        if self._market_overview_cache is not None:
+            return self._market_overview_cache
+
         if not self.engine or not self.engine.tushare:
+            self._market_overview_cache = ""
             return ""
 
         overview = self.engine.tushare.get_market_overview(self.trade_date)
         if not overview:
+            self._market_overview_cache = ""
             return ""
 
         parts = []
@@ -73,7 +79,8 @@ class FeishuNotifier:
             north_b = float(overview["north_net"]) / 1e4
             parts.append(f"北向资金净流入: {north_b:.1f}亿")
 
-        return " | ".join(parts) if parts else ""
+        self._market_overview_cache = " | ".join(parts) if parts else ""
+        return self._market_overview_cache
 
     def _format_stock_text(self, symbols: list[str], names: dict[str, str],
                             metas: dict[str, dict]) -> str:
