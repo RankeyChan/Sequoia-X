@@ -85,12 +85,12 @@ class FeishuNotifier:
             stock = f"[{name}({code})](https://xueqiu.com/S/{xq_code})"
             meta = metas.get(code)
 
-            pe = f"{meta['pe_ttm']:.1f}" if (meta and meta.get("pe_ttm") and meta["pe_ttm"] > 0) else "-"
+            pe = f"{float(meta['pe_ttm']):.1f}" if (meta and meta.get("pe_ttm") and meta["pe_ttm"] > 0) else "-"
             industry = meta.get("industry", "-") if (meta and meta.get("industry") and meta["industry"] not in ("", "None")) else "-"
-            mv = f"{meta['circ_mv']/1e4:.0f}亿" if (meta and meta.get("circ_mv") and meta["circ_mv"] > 0) else "-"
+            mv = f"{float(meta['circ_mv'])/1e4:.0f}亿" if (meta and meta.get("circ_mv") and meta["circ_mv"] > 0) else "-"
             mf = "-"
             if meta and meta.get("net_mf_amount") and meta["net_mf_amount"] != 0:
-                val = meta["net_mf_amount"] / 1e4
+                val = float(meta["net_mf_amount"]) / 1e4
                 direction = "流入" if val > 0 else "流出"
                 mf = f"主力{direction}{abs(val):.1f}亿"
 

@@ -193,14 +193,17 @@ class MySQLEngine:
         """执行 SQL 查询，返回 DataFrame。
 
         含参数时用原生 PyMySQL 连接（避免 SQLAlchemy 的 %s 混淆）。
-        无参数时用 SQLAlchemy 引擎（pandas read_sql 效率更高）。
+        无参数时用 SQLAlchemy 引擎。
         """
+        import warnings
         if params is not None:
             if isinstance(params, (list, set)):
                 params = tuple(params)
             conn = self._get_conn()
             try:
-                return pd.read_sql(sql, conn, params=params)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    return pd.read_sql(sql, conn, params=params)
             finally:
                 conn.close()
         return pd.read_sql(sql, self._get_sqlalchemy_engine())

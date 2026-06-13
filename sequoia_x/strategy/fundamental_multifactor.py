@@ -30,13 +30,12 @@ class FundamentalMultifactorStrategy(BaseStrategy):
     def run(self) -> list[str]:
         try:
             # 最新报告期
-            latest = self.engine.fetch_one(
+            end_date = self.engine.fetch_one(
                 "SELECT MAX(end_date) FROM ts_fina_indicator"
-            ).fetchone()
-            if not latest or not latest[0]:
+            )
+            if not end_date:
                 logger.info("FundamentalMultifactor: fina_indicator 无数据")
                 return []
-            end_date = latest[0]
 
             df = self.engine.query(
                 f"""
