@@ -54,57 +54,47 @@ def _write_mysql(conn: pymysql.Connection, table: str, df: pd.DataFrame) -> int:
     """
     if df.empty:
         return 0
-    df = df.where(pd.notnull(df), None)
 
     with conn.cursor() as cur:
         cur.execute(f"SHOW COLUMNS FROM `{table}`")
         table_cols = {r[0] for r in cur.fetchall()}
-    # 只取 DataFrame 与表中匹配的列，排除 id / row_hash
     available = [c for c in df.columns if c in table_cols and c not in ("id", "row_hash")]
     if not available:
         return 0
 
     has_row_hash = "row_hash" in table_cols
+    sub = df[available]
 
+    # 向量化 NaN → None 转换（比 iterrows 逐行判断快 ~50x）
+    import numpy as np
+    arrays = {
+        c: sub[c].to_numpy(dtype=object, na_value=None)
+        for c in available
+    }
+    n_rows = len(sub)
+
+    # 构建 rows 列表：逐行提取但用 numpy 索引（远快于 iterrows）
+    rows: list[tuple] = []
     if has_row_hash:
-        # ── 方案 C：哈希去重 ──
+        for i in range(n_rows):
+            vals = [arrays[c][i] for c in available]
+            h = _compute_row_hash(vals)
+            rows.append((h, *vals))
         cols = "`row_hash`, " + ", ".join(f"`{c}`" for c in available)
         placeholders = ", ".join(["%s"] * (1 + len(available)))
         sql = f"INSERT IGNORE INTO `{table}` ({cols}) VALUES ({placeholders})"
-
-        rows: list[tuple] = []
-        for _, row in df[available].iterrows():
-            vals = [
-                None if (isinstance(row[c], float) and pd.isna(row[c])) or row[c] is None
-                else row[c]
-                for c in available
-            ]
-            row_hash = _compute_row_hash(vals)
-            rows.append((row_hash, *vals))
-
-        with conn.cursor() as cur:
-            cur.executemany(sql, rows)
-        inserted = cur.rowcount
     else:
-        # ── 降级：普通 INSERT ──
+        for i in range(n_rows):
+            rows.append(tuple(arrays[c][i] for c in available))
         cols = ", ".join(f"`{c}`" for c in available)
         placeholders = ", ".join(["%s"] * len(available))
         sql = f"INSERT INTO `{table}` ({cols}) VALUES ({placeholders})"
 
-        rows: list[tuple] = []
-        for _, row in df[available].iterrows():
-            vals = [
-                None if (isinstance(row[c], float) and pd.isna(row[c])) or row[c] is None
-                else row[c]
-                for c in available
-            ]
-            rows.append(tuple(vals))
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
+    inserted = cur.rowcount if has_row_hash else len(rows)
 
-        with conn.cursor() as cur:
-            cur.executemany(sql, rows)
-        inserted = len(rows)
-
-    logger.debug(f"[{table}] 写入 {inserted} 行（跳过 {len(df) - inserted} 条重复）")
+    logger.info(f"[{table}] 写入 {inserted} 行（跳过 {len(df) - inserted} 条重复）")
     return inserted
 
 
@@ -226,32 +216,35 @@ def _get_global_conn():
 # ══════════════════════════════════════════════════════════════════════
 
 def _sync_task_list(self, tasks: list, trade_date: str) -> dict[str, int]:
-    """执行一批同步任务，返回 {table: count}。"""
+    """执行一批同步任务，返回 {table: count}。
+
+    复用同一个 DB 连接，只在与 Tushare API 间加入最小间隔以防止限流。
+    """
     import time as _tm
     result: dict[str, int] = {}
-    for api_method, table, rename in tasks:
-        try:
-            method = getattr(self.tushare, api_method)
+    conn = self._get_conn()
+    try:
+        for api_method, table, rename in tasks:
             try:
-                df = method(trade_date=trade_date)
-            except TypeError:
+                method = getattr(self.tushare, api_method)
                 try:
-                    df = method(trade_date)
-                except Exception:
-                    continue
-            if df is not None and not df.empty:
-                if rename:
-                    df = df.rename(columns=rename)
-                conn = self._get_conn()
-                try:
+                    df = method(trade_date=trade_date)
+                except TypeError:
+                    try:
+                        df = method(trade_date)
+                    except Exception:
+                        continue
+                if df is not None and not df.empty:
+                    if rename:
+                        df = df.rename(columns=rename)
                     result[table] = _write_mysql(conn, table, df)
-                finally:
-                    conn.close()
-        except Exception as exc:
-            if _is_db_error(exc):
-                raise
-            pass
-        _tm.sleep(0.12)
+            except Exception as exc:
+                if _is_db_error(exc):
+                    raise
+                pass
+            _tm.sleep(0.06)  # 最小间隔，HTTP 往返已提供大部分延迟
+    finally:
+        conn.close()
     return result
 
 
@@ -259,20 +252,20 @@ def _sync_week_month_freq(self, trade_date: str) -> dict[str, int]:
     """同步周月线表（每日调用，分别传 freq=week 和 freq=month）。"""
     import time as _tm
     result: dict[str, int] = {}
-    for api_method, table, _ in _WEEK_MONTH_FREQ_APIS:
-        for freq in ("week", "month"):
-            try:
-                method = getattr(self.tushare, api_method)
-                df = method(trade_date=trade_date, freq=freq)
-                if df is not None and not df.empty:
-                    conn = self._get_conn()
-                    try:
+    conn = self._get_conn()
+    try:
+        for api_method, table, _ in _WEEK_MONTH_FREQ_APIS:
+            for freq in ("week", "month"):
+                try:
+                    method = getattr(self.tushare, api_method)
+                    df = method(trade_date=trade_date, freq=freq)
+                    if df is not None and not df.empty:
                         result[table] = result.get(table, 0) + _write_mysql(conn, table, df)
-                    finally:
-                        conn.close()
-            except Exception:
-                pass
-            _tm.sleep(0.12)
+                except Exception:
+                    pass
+            # 速率限制由 TushareProvider._call 内置的 RateLimiter 统一管理
+    finally:
+        conn.close()
     return result
 
 
@@ -368,7 +361,7 @@ def _sync_financial(self, trade_date: str = "") -> dict[str, int]:
             logger.info(f"[财务] stk_rewards: 完成 {len(frames)} 批, 写入 {len(all_df)} 行")
     _tm.sleep(0.3)
 
-    # ── 2. 逐股同步（剩余非 VIP 接口）──
+    # ── 2. 批量同步（dividend/fina_audit 支持逗号分隔 ts_code）──
     conn = self._get_conn()
     try:
         with conn.cursor() as cur:
@@ -378,46 +371,49 @@ def _sync_financial(self, trade_date: str = "") -> dict[str, int]:
         conn.close()
 
     if not codes:
-        logger.warning("无法获取股票列表，跳过逐股财务同步")
+        logger.warning("无法获取股票列表，跳过财务同步")
         return result
 
     total = len(codes)
+    batch_size = 200
     for api_name in _FINANCIAL_PER_STOCK:
         table = f"ts_{api_name}"
         method = getattr(self.tushare, f"get_{api_name}", None)
         if method is None:
             continue
 
-        fail_count = 0
-        written = 0
-        logger.info(f"[财务] {api_name}: 逐股同步 {total} 只...")
-        for idx, ts_code in enumerate(codes):
-            _tm.sleep(0.5)
+        frames = []
+        logger.info(f"[财务] {api_name}: 批量同步 {total} 只（每批 {batch_size} 个）...")
+        for i in range(0, total, batch_size):
+            batch = codes[i:i + batch_size]
+            batch_str = ",".join(batch)
             try:
-                if api_name in ("dividend", "stk_rewards"):
-                    df = method(ts_code=ts_code, end_date=period)
+                if api_name == "dividend":
+                    df = method(ts_code=batch_str, end_date=period)
                 else:
-                    df = method(ts_code=ts_code, period=period)
+                    df = method(ts_code=batch_str, period=period)
             except Exception as exc:
                 if _is_db_error(exc):
                     logger.error(f"[财务] {api_name}: 数据库错误，停止同步: {exc}")
                     raise
-                fail_count += 1
-                if fail_count >= 5:
-                    _tm.sleep(10)
-                    fail_count = 0
+                logger.warning(f"[财务] {api_name} batch failed at {i}: {exc}")
                 continue
-            fail_count = 0
             if df is not None and not df.empty:
-                conn = self._get_conn()
-                try:
-                    n = _write_mysql(conn, table, df)
-                    written += n
-                finally:
-                    conn.close()
-            if (idx + 1) % 500 == 0:
-                logger.info(f"[财务] {api_name}: {idx+1}/{total} ({written} 条)")
-        logger.info(f"[财务] {api_name}: 完成 {written} 条")
+                frames.append(df)
+            _tm.sleep(0.3)
+            if (i + batch_size) % 2000 == 0:
+                logger.info(f"[财务] {api_name}: {min(i+batch_size, total)}/{total}")
+        if frames:
+            all_df = pd.concat(frames, ignore_index=True)
+            conn = self._get_conn()
+            try:
+                n = _write_mysql(conn, table, all_df)
+                result[table] = n
+            finally:
+                conn.close()
+            logger.info(f"[财务] {api_name}: 完成 {len(frames)} 批, 写入 {n} 条")
+        else:
+            logger.info(f"[财务] {api_name}: 无数据")
 
     return result
 
@@ -427,19 +423,26 @@ def _sync_financial(self, trade_date: str = "") -> dict[str, int]:
 # ══════════════════════════════════════════════════════════════════════
 
 def _ensure_recent_data(self, trade_date: str) -> dict[str, int]:
+    """补齐最近 60 个交易日的缺失数据。"""
     if not self.tushare:
+        logger.debug("[回填] Tushare 未启用，跳过")
         return {}
     conn = self._get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT cal_date FROM ts_trade_cal WHERE is_open='1' ORDER BY cal_date DESC LIMIT 60"
+                "SELECT cal_date FROM ts_trade_cal WHERE is_open='1' AND cal_date <= %s"
+                " ORDER BY cal_date DESC LIMIT 60",
+                (trade_date,),
             )
             target = [r[0] for r in cur.fetchall()]
     finally:
         conn.close()
     if not target:
+        logger.debug("[回填] ts_trade_cal 无交易日数据，跳过")
         return {}
+
+    logger.debug(f"[回填] 最近 60 个交易日: {target[-1]} ~ {target[0]}")
 
     conn = self._get_conn()
     try:
@@ -451,15 +454,20 @@ def _ensure_recent_data(self, trade_date: str) -> dict[str, int]:
         conn.close()
 
     missing = [d for d in target if d not in existing]
+    logger.debug(f"[回填] ts_daily 已有 {len(existing)} 天, 缺失 {len(missing)} 天")
     if not missing:
+        logger.info("[回填] 无缺失数据，跳过")
         return {}
 
-    logger.info(f"补齐缺失数据: {len(missing)} 个交易日")
+    logger.info(f"[回填] 补齐缺失数据: {len(missing)} 个交易日 ({missing[0]}~{missing[-1]})")
     total: dict[str, int] = {}
-    for md in missing:
+    for idx, md in enumerate(missing):
+        logger.debug(f"[回填] 同步 {md} ({idx+1}/{len(missing)})...")
         cr = _sync_task_list(self, _DAILY_APIS, md)
         for k, v in cr.items():
             total[k] = total.get(k, 0) + v
+        if (idx + 1) % 10 == 0:
+            logger.info(f"[回填] 进度: {idx+1}/{len(missing)}")
     return total
 
 
@@ -503,16 +511,77 @@ def sync_today(self, trade_date: str = "") -> dict[str, int]:
 
 # ── 回填 ──
 
-def backfill_tushare(self, start: str = "2026-01-01") -> dict[str, int]:
+def backfill_tushare(self, start: str = "") -> dict[str, int]:
+    """回填最近 60 个交易日缺失的数据。
+
+    Args:
+        start: 回填起始日期 (YYYYMMDD)。为空时自动计算：最近交易日前 60 个交易日。
+    """
     if not self.tushare:
+        logger.warning("[回填] Tushare 未启用")
         return {}
+
+    # 计算动态起始日期
+    if not start:
+        start = _compute_backfill_start(self)
+        logger.info(f"[回填] 自动计算起始日期: {start}")
+    else:
+        start = start.replace("-", "")
+        logger.info(f"[回填] 指定起始日期: {start}")
+
     # 初始化基础数据
+    logger.debug("[回填] 初始化 stock_basic...")
     _init_tushare_basics(self)
-    _init_tushare_trade_cal(self, start.replace("-", ""), date.today().strftime("%Y%m%d"))
-    logger.info("开始 60 交易日数据补齐...")
+
+    logger.debug(f"[回填] 初始化 trade_cal ({start} ~ {date.today().strftime('%Y%m%d')})...")
+    _init_tushare_trade_cal(self, start, date.today().strftime("%Y%m%d"))
+
+    logger.info(f"[回填] 开始 60 交易日数据补齐 (起始: {start})...")
     result = _ensure_recent_data(self, date.today().strftime("%Y%m%d"))
-    logger.info(f"backfill done: {dict(sorted(result.items()))}")
+    logger.info(f"[回填] 完成: {dict(sorted(result.items()))}")
     return result
+
+
+def _compute_backfill_start(self) -> str:
+    """计算回填起始日期：最近交易日前推 60 个交易日。
+
+    优先从本地 ts_trade_cal 查询，若无数据则以今日前 90 个自然日兜底。
+    """
+    from datetime import date as dt, timedelta
+
+    # 尝试从已有 trade_cal 计算
+    try:
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                today = dt.today().strftime("%Y%m%d")
+                cur.execute(
+                    "SELECT COUNT(*) FROM ts_trade_cal"
+                    " WHERE is_open='1' AND cal_date <= %s", (today,)
+                )
+                if cur.fetchone()[0] >= 60:
+                    cur.execute(
+                        "SELECT cal_date FROM ts_trade_cal"
+                        " WHERE is_open='1' AND cal_date <= %s"
+                        " ORDER BY cal_date DESC LIMIT 60", (today,)
+                    )
+                    dates = [r[0] for r in cur.fetchall()]
+                    if dates:
+                        start = dates[-1]
+                        logger.debug(
+                            f"[回填] 从 trade_cal 推算: 最近 60 交易日 "
+                            f"{dates[-1]} ~ {dates[0]}, 起始={start}"
+                        )
+                        return start
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.debug(f"[回填] 从 trade_cal 推算失败: {exc}")
+
+    # 兜底：今日前 90 个自然日（约覆盖 60 个交易日）
+    fallback = (dt.today() - timedelta(days=90)).strftime("%Y%m%d")
+    logger.debug(f"[回填] 日历兜底起始: {fallback}")
+    return fallback
 
 
 def _init_tushare_basics(self) -> None:
@@ -520,15 +589,19 @@ def _init_tushare_basics(self) -> None:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM ts_stock_basic")
-            if cur.fetchone()[0] > 0:
+            cnt = cur.fetchone()[0]
+            if cnt > 0:
+                logger.debug(f"[回填] stock_basic 已有 {cnt} 条, 跳过")
                 return
     finally:
         conn.close()
+    logger.debug("[回填] stock_basic 为空, 从 Tushare 拉取...")
     df = self.tushare.get_stock_basic()
     if not df.empty:
         conn = self._get_conn()
         try:
-            _write_mysql(conn, "ts_stock_basic", df)
+            n = _write_mysql(conn, "ts_stock_basic", df)
+            logger.debug(f"[回填] stock_basic 写入 {n} 条")
         finally:
             conn.close()
 
@@ -538,15 +611,19 @@ def _init_tushare_trade_cal(self, start: str, end: str) -> None:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM ts_trade_cal")
-            if cur.fetchone()[0] > 20:
+            cnt = cur.fetchone()[0]
+            if cnt > 20:
+                logger.debug(f"[回填] trade_cal 已有 {cnt} 条, 跳过")
                 return
     finally:
         conn.close()
+    logger.debug(f"[回填] trade_cal 不足, 从 Tushare 拉取 ({start}~{end})...")
     df = self.tushare.get_trade_cal(start, end)
     if not df.empty:
         conn = self._get_conn()
         try:
-            _write_mysql(conn, "ts_trade_cal", df)
+            n = _write_mysql(conn, "ts_trade_cal", df)
+            logger.debug(f"[回填] trade_cal 写入 {n} 条")
         finally:
             conn.close()
 
@@ -630,9 +707,9 @@ def sync_table(self, table_name: str, trade_date: str = "") -> int:
                     frames.append(chunk)
                 if (idx + 1) % 500 == 0:
                     logger.info(f"[{table_name}] 进度: {idx + 1}/{total_codes}")
-                if (idx + 1) % 50 == 0:
+                if (idx + 1) % 100 == 0:
                     import time as _t
-                    _t.sleep(0.1)  # 控制 API 调用频率
+                    _t.sleep(0.05)  # 控制 API 调用频率
             if frames:
                 df = pd.concat(frames, ignore_index=True)
             logger.info(f"[{table_name}] 逐股完成: {len(frames)} 只有数据")

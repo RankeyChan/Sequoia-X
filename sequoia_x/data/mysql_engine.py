@@ -283,6 +283,12 @@ class MySQLEngine:
             df = df.rename(columns={"vol": "volume", "trade_date": "date"})
         if "amount" in df.columns and "turnover" not in df.columns:
             df = df.rename(columns={"amount": "turnover"})
+        # 确保数值列为 float（MySQL NULL → pd.to_numeric → NaN，避免 Python None）
+        _numeric_cols = ["open", "high", "low", "close", "pre_close",
+                         "pct_chg", "volume", "turnover"]
+        for _nc in _numeric_cols:
+            if _nc in df.columns:
+                df[_nc] = pd.to_numeric(df[_nc], errors="coerce")
         cache: dict[str, "pd.DataFrame"] = {}
         for code, group in df.groupby("ts_code"):
             cache[code] = group.reset_index(drop=True)
@@ -307,6 +313,12 @@ class MySQLEngine:
             df = df.rename(columns={"vol": "volume", "trade_date": "date"})
         if "amount" in df.columns and "turnover" not in df.columns:
             df = df.rename(columns={"amount": "turnover"})
+        # 确保数值列为 float
+        _numeric_cols = ["open", "high", "low", "close", "pre_close",
+                         "pct_chg", "volume", "turnover"]
+        for _nc in _numeric_cols:
+            if _nc in df.columns:
+                df[_nc] = pd.to_numeric(df[_nc], errors="coerce")
         return df
 
     def get_all_ohlcv(self, symbols: list[str] | None = None) -> dict[str, 'pd.DataFrame']:

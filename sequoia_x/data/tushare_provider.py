@@ -13,6 +13,43 @@ from sequoia_x.core.logger import get_logger
 logger = get_logger(__name__)
 
 
+
+class RateLimiter:
+    """滑动窗口速率限制器。
+
+    确保在任意 60 秒窗口内不超过 max_calls 次调用。
+    所有 Tushare API 调用共享同一个限制器实例。
+    """
+
+    def __init__(self, max_calls: int = 150, window: float = 60.0) -> None:
+        self.max_calls = max_calls
+        self.window = window
+        self._timestamps: list[float] = []
+        self._lock_count = 0
+
+    def acquire(self) -> None:
+        """等待直到可以发起下一次 API 调用。"""
+        import time as _t
+        now = _t.monotonic()
+        # 清理窗口外的旧记录
+        self._timestamps = [ts for ts in self._timestamps if ts > now - self.window]
+        # 窗口内已达上限 → 等待最旧记录过期
+        if len(self._timestamps) >= self.max_calls:
+            wait = self._timestamps[0] + self.window - now
+            if wait > 0:
+                _t.sleep(wait)
+            now = _t.monotonic()
+            self._timestamps = [ts for ts in self._timestamps if ts > now - self.window]
+        self._timestamps.append(now)
+
+    @property
+    def recent_count(self) -> int:
+        """返回最近窗口内的调用次数。"""
+        import time as _t
+        now = _t.monotonic()
+        return sum(1 for ts in self._timestamps if ts > now - self.window)
+
+
 class TushareProvider:
     """Tushare 数据提供者（官方 SDK 封装）。
 
@@ -51,7 +88,7 @@ class TushareProvider:
             from urllib3.util.retry import Retry
             from requests.adapters import HTTPAdapter
             session = self._pro._DataApi__session
-            retry = Retry(total=3, backoff_factor=0.5,
+            retry = Retry(total=5, backoff_factor=0.5,
                           status_forcelist=[500, 502, 503, 504])
             adapter = HTTPAdapter(
                 max_retries=retry,
@@ -66,6 +103,9 @@ class TushareProvider:
         except Exception:
             pass
 
+        # ── 速率限制器（150 次/分钟，避免 Rate limit exceeded）──
+        self._rate_limiter = RateLimiter(max_calls=150)
+
         logger.info(
             f"TushareProvider 初始化完成"
             + (f" (代理: {proxy_url})" if proxy_url else "")
@@ -74,19 +114,52 @@ class TushareProvider:
     # ── 通用查询 ──
 
     def _call(self, api_name: str, **params: Any) -> pd.DataFrame:
-        """调用 Tushare SDK 接口，返回 DataFrame。"""
-        try:
-            func = getattr(self._pro, api_name, None)
-            if func is None:
-                logger.error(f"Tushare SDK 无此接口: {api_name}")
-                return pd.DataFrame()
-            df = func(**{k: v for k, v in params.items() if v is not None and v != ""})
-            if df is None or df.empty:
-                return pd.DataFrame()
-            return df
-        except Exception as exc:
-            logger.warning(f"Tushare [{api_name}] 调用失败: {exc}")
-            return pd.DataFrame()
+        """调用 Tushare SDK 接口，内置速率限制和 Rate Limit 重试。
+
+        所有调用先通过 RateLimiter 排队，超出 150 次/分钟时自动等待。
+        遇到 Rate limit exceeded 时阶梯重试（5s / 10s / 15s），最多 3 次。
+        """
+        import time as _t
+        max_retries = 3
+        for attempt in range(max_retries):
+            self._rate_limiter.acquire()
+            try:
+                func = getattr(self._pro, api_name, None)
+                if func is None:
+                    logger.error(f"Tushare SDK 无此接口: {api_name}")
+                    return pd.DataFrame()
+                df = func(**{k: v for k, v in params.items() if v is not None and v != ""})
+                if df is None or df.empty:
+                    return pd.DataFrame()
+                return df
+            except Exception as exc:
+                msg = str(exc).lower()
+                # 速率限制 → 长间隔重试
+                if "rate limit" in msg or "too many" in msg or "throttle" in msg:
+                    wait = (attempt + 1) * 5
+                    logger.warning(
+                        f"Tushare [{api_name}] 速率限制，"
+                        f"{wait}s 后重试 ({attempt+1}/{max_retries})"
+                    )
+                    _t.sleep(wait)
+                # 代理/网络连接错误 → 短间隔重试（连接恢复快）
+                elif any(kw in msg for kw in (
+                    "connection refused", "connection aborted",
+                    "max retries exceeded", "failed to establish",
+                    "connection reset", "timeout", "timed out",
+                    "broken pipe", "remote end closed",
+                )):
+                    wait = (attempt + 1) * 2
+                    logger.warning(
+                        f"Tushare [{api_name}] 连接异常，"
+                        f"{wait}s 后重试 ({attempt+1}/{max_retries})"
+                    )
+                    _t.sleep(wait)
+                else:
+                    logger.warning(f"Tushare [{api_name}] 调用失败: {exc}")
+                    return pd.DataFrame()
+        logger.error(f"Tushare [{api_name}] 重试 {max_retries} 次后仍失败，放弃")
+        return pd.DataFrame()
 
     @staticmethod
     def _extract_symbol(df: pd.DataFrame) -> pd.DataFrame:

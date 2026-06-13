@@ -121,7 +121,7 @@ def main() -> None:
 
         # ── 回填模式 ──
         if args.backfill:
-            start = args.start or settings.start_date
+            start = args.start or ""
             logger.info(f"进入回填模式（起始日期: {start}）...")
             engine.backfill_tushare(start)
             logger.info("回填完成")

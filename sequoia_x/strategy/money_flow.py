@@ -45,6 +45,14 @@ class MoneyFlowStrategy(BaseStrategy):
                 """,
                 params=symbols,
             )
+            # 确保数值列为 float（避免 MySQL NULL → Python None → TypeError）
+            _num_cols = ["buy_elg_amount", "sell_elg_amount",
+                         "buy_lg_amount", "sell_lg_amount",
+                         "buy_sm_amount", "sell_sm_amount",
+                         "net_mf_amount"]
+            for _nc in _num_cols:
+                if _nc in df.columns:
+                    df[_nc] = pd.to_numeric(df[_nc], errors="coerce")
             return df
         except Exception as exc:
             logger.warning(f"读取 moneyflow 失败: {exc}")
@@ -93,7 +101,7 @@ class MoneyFlowStrategy(BaseStrategy):
                 # 条件 2：近5日散户净流出（每天 < 0）
                 retail_all_negative = (stock_mf["retail_net"] < 0).all()
                 # 条件 3：总净流入 > 0
-                total_net = stock_mf["net_mf_amount"].sum()
+                total_net = stock_mf["net_mf_amount"].fillna(0).sum()
 
                 if main_all_positive and retail_all_negative and total_net > 0:
                     # 验证成交量条件
