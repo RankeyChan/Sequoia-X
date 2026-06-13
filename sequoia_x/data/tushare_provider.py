@@ -46,6 +46,26 @@ class TushareProvider:
             proxy_url or "http://api.tushare.pro"
         )
 
+        # ── 增大超时 + 重试，应对代理波动 ──
+        try:
+            from urllib3.util.retry import Retry
+            from requests.adapters import HTTPAdapter
+            session = self._pro._DataApi__session
+            retry = Retry(total=3, backoff_factor=0.5,
+                          status_forcelist=[500, 502, 503, 504])
+            adapter = HTTPAdapter(
+                max_retries=retry,
+                pool_connections=10,
+                pool_maxsize=10,
+            )
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            # 设置 session 级别的超时
+            from requests import Timeout
+            session.timeout = Timeout(connect=30, read=30)
+        except Exception:
+            pass
+
         logger.info(
             f"TushareProvider 初始化完成"
             + (f" (代理: {proxy_url})" if proxy_url else "")
@@ -663,9 +683,8 @@ class TushareProvider:
         """中央结算系统持股明细。"""
         return self._extract_symbol(self._call("ccass_hold_detail", ts_code=ts_code, trade_date=trade_date))
 
-    def get_slb_sec(self, trade_date: str = "", ts_code: str = "") -> pd.DataFrame:
-        """转融券交易汇总。"""
-        return self._extract_symbol(self._call("slb_sec", trade_date=trade_date, ts_code=ts_code))
+    # slb_sec 已作废（交易所停用）
+    # def get_slb_sec ...
 
     def get_slb_len(self, trade_date: str = "", start_date: str = "", end_date: str = "") -> pd.DataFrame:
         """转融资交易汇总。"""
@@ -767,3 +786,203 @@ class TushareProvider:
     def get_hm_detail(self, trade_date: str = "", ts_code: str = "") -> pd.DataFrame:
         """游资交易每日明细。"""
         return self._extract_symbol(self._call("hm_detail", trade_date=trade_date, ts_code=ts_code))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # api_summary.json 补齐 — 26 个缺失 Provider
+    # ══════════════════════════════════════════════════════════════════════
+
+    def get_bak_daily(self, trade_date: str = "", ts_code: str = "",
+                      start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """获取备用行情。"""
+        params = dict(trade_date=trade_date, ts_code=ts_code,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("bak_daily", **params))
+
+    def get_dc_index(self, trade_date: str = "", ts_code: str = "",
+                     name: str = "", idx_type: str = "",
+                     start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """东方财富概念板块。"""
+        params = dict(trade_date=trade_date, ts_code=ts_code, name=name,
+                      idx_type=idx_type, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("dc_index", **params))
+
+    def get_disclosure_date(self, ts_code: str = "", end_date: str = "",
+                            pre_date: str = "", actual_date: str = "",
+                            ann_date: str = "") -> pd.DataFrame:
+        """财报披露计划日期。"""
+        params = dict(ts_code=ts_code, end_date=end_date, pre_date=pre_date,
+                      actual_date=actual_date, ann_date=ann_date)
+        return self._extract_symbol(self._call("disclosure_date", **params))
+
+    def get_hm_list(self, name: str = "") -> pd.DataFrame:
+        """游资名录。"""
+        return self._call("hm_list", name=name)
+
+    def get_limit_cpt_list(self, trade_date: str = "", ts_code: str = "",
+                           start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """涨停最强板块。"""
+        params = dict(trade_date=trade_date, ts_code=ts_code,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("limit_cpt_list", **params))
+
+    def get_margin(self, trade_date: str = "", exchange_id: str = "",
+                   start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """融资融券交易汇总。"""
+        params = dict(trade_date=trade_date, exchange_id=exchange_id,
+                      start_date=start_date, end_date=end_date)
+        return self._call("margin", **params)
+
+    def get_monthly(self, ts_code: str = "", trade_date: str = "",
+                    start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """月线行情。"""
+        params = dict(ts_code=ts_code, trade_date=trade_date,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("monthly", **params))
+
+    def get_pledge_detail(self, ts_code: str = "", ann_date: str = "",
+                          start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """股权质押明细。"""
+        params = dict(ts_code=ts_code, ann_date=ann_date,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("pledge_detail", **params))
+
+    def get_rt_k(self, ts_code: str = "") -> pd.DataFrame:
+        """实时日K线。"""
+        return self._extract_symbol(self._call("rt_k", ts_code=ts_code))
+
+    def get_rt_min(self, ts_code: str, freq: str = "") -> pd.DataFrame:
+        """实时分钟线。"""
+        return self._extract_symbol(self._call("rt_min", ts_code=ts_code, freq=freq))
+
+    def get_rt_min_daily(self, ts_code: str, freq: str = "") -> pd.DataFrame:
+        """A股实时分钟-日累计。"""
+        return self._extract_symbol(self._call("rt_min_daily", ts_code=ts_code, freq=freq))
+
+    # slb_len_mm / slb_sec_detail 已作废（交易所停用）
+
+    def get_stk_account(self, date: str = "", start_date: str = "",
+                        end_date: str = "") -> pd.DataFrame:
+        """股票开户数据。"""
+        return self._call("stk_account", date=date,
+                          start_date=start_date, end_date=end_date)
+
+    def get_stk_account_old(self, start_date: str = "",
+                            end_date: str = "") -> pd.DataFrame:
+        """股票开户数据(旧)。"""
+        return self._call("stk_account_old", start_date=start_date, end_date=end_date)
+
+    def get_stk_ah_comparison(self, ts_code: str = "", trade_date: str = "",
+                              start_date: str = "", end_date: str = "",
+                              hk_code: str = "") -> pd.DataFrame:
+        """AH股比价。"""
+        params = dict(ts_code=ts_code, trade_date=trade_date,
+                      start_date=start_date, end_date=end_date, hk_code=hk_code)
+        return self._extract_symbol(self._call("stk_ah_comparison", **params))
+
+    def get_stk_alert(self, ts_code: str = "", start_date: str = "",
+                      end_date: str = "", trade_date: str = "") -> pd.DataFrame:
+        """交易所重点提示证券。"""
+        params = dict(ts_code=ts_code, start_date=start_date,
+                      end_date=end_date, trade_date=trade_date)
+        return self._extract_symbol(self._call("stk_alert", **params))
+
+    def get_stk_mins(self, ts_code: str, freq: str = "",
+                     start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """历史分钟行情。"""
+        params = dict(ts_code=ts_code, freq=freq,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("stk_mins", **params))
+
+    def get_stk_week_month_adj(self, ts_code: str = "", trade_date: str = "",
+                               freq: str = "", start_date: str = "",
+                               end_date: str = "") -> pd.DataFrame:
+        """周/月线复权行情。"""
+        params = dict(ts_code=ts_code, trade_date=trade_date, freq=freq,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("stk_week_month_adj", **params))
+
+    def get_stk_weekly_monthly(self, ts_code: str = "", trade_date: str = "",
+                               freq: str = "", start_date: str = "",
+                               end_date: str = "") -> pd.DataFrame:
+        """周/月线行情（每日更新）。"""
+        params = dict(ts_code=ts_code, trade_date=trade_date, freq=freq,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("stk_weekly_monthly", **params))
+
+    def get_suspend_d(self, trade_date: str = "", ts_code: str = "",
+                       start_date: str = "", end_date: str = "",
+                       suspend_type: str = "") -> pd.DataFrame:
+        """每日停复牌信息。"""
+        params = dict(trade_date=trade_date, ts_code=ts_code,
+                      start_date=start_date, end_date=end_date,
+                      suspend_type=suspend_type)
+        return self._extract_symbol(self._call("suspend_d", **params))
+
+    def get_tdx_index(self, ts_code: str = "", trade_date: str = "",
+                      idx_type: str = "") -> pd.DataFrame:
+        """通达信板块信息。"""
+        return self._extract_symbol(self._call("tdx_index", ts_code=ts_code,
+                                                trade_date=trade_date, idx_type=idx_type))
+
+    def get_ths_index(self, ts_code: str = "", exchange: str = "",
+                      type: str = "") -> pd.DataFrame:
+        """同花顺板块指数。"""
+        return self._extract_symbol(self._call("ths_index", ts_code=ts_code,
+                                                exchange=exchange, type=type))
+
+    def get_ths_member(self, ts_code: str = "", con_code: str = "") -> pd.DataFrame:
+        """同花顺概念成分。"""
+        return self._extract_symbol(self._call("ths_member", ts_code=ts_code, con_code=con_code))
+
+    def get_weekly(self, ts_code: str = "", trade_date: str = "",
+                   start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """周线行情。"""
+        params = dict(ts_code=ts_code, trade_date=trade_date,
+                      start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("weekly", **params))
+
+    # ══════════════════════════════════════════════════════════════════════
+    # VIP 接口（全量数据，period 即可，无需 ts_code）
+    # ══════════════════════════════════════════════════════════════════════
+
+    def get_income_vip(self, period: str = "",
+                       start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """利润表（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("income_vip", **params))
+
+    def get_balancesheet_vip(self, period: str = "",
+                             start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """资产负债表（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("balancesheet_vip", **params))
+
+    def get_cashflow_vip(self, period: str = "",
+                         start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """现金流量表（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("cashflow_vip", **params))
+
+    def get_forecast_vip(self, period: str = "",
+                         start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """业绩预告（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("forecast_vip", **params))
+
+    def get_express_vip(self, period: str = "",
+                        start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """业绩快报（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("express_vip", **params))
+
+    def get_fina_indicator_vip(self, period: str = "",
+                               start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """财务指标数据（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("fina_indicator_vip", **params))
+
+    def get_fina_mainbz_vip(self, period: str = "",
+                            start_date: str = "", end_date: str = "") -> pd.DataFrame:
+        """主营业务构成（VIP，按报告期取全量）。"""
+        params = dict(period=period, start_date=start_date, end_date=end_date)
+        return self._extract_symbol(self._call("fina_mainbz_vip", **params))

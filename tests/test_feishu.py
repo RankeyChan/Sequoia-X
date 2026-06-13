@@ -14,7 +14,6 @@ from sequoia_x.notify.feishu import FeishuNotifier
 
 def make_settings(webhook_url: str = "https://example.com/default") -> Settings:
     return Settings(
-        db_path="data/test.db",
         start_date="2024-01-01",
         feishu_webhook_url=webhook_url,
     )

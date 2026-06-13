@@ -1,14 +1,11 @@
 """基本面多因子策略：ROE + 毛利率 + 营收增速 + PE 等权打分，中长线持股。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class FundamentalMultifactorStrategy(BaseStrategy):
     """基本面多因子策略。
@@ -32,23 +29,20 @@ class FundamentalMultifactorStrategy(BaseStrategy):
 
     def run(self) -> list[str]:
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                # 最新报告期
-                latest = conn.execute(
-                    "SELECT MAX(end_date) FROM fina_indicator"
-                ).fetchone()
-                if not latest or not latest[0]:
-                    logger.info("FundamentalMultifactor: fina_indicator 无数据")
-                    return []
-                end_date = latest[0]
+            # 最新报告期
+            latest = self.engine.fetch_one(
+                "SELECT MAX(end_date) FROM ts_fina_indicator"
+            ).fetchone()
+            if not latest or not latest[0]:
+                logger.info("FundamentalMultifactor: fina_indicator 无数据")
+                return []
+            end_date = latest[0]
 
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, roe, grossprofit_margin, or_yoy
-                    FROM fina_indicator WHERE end_date = '{end_date}'
-                    """,
-                    conn,
-                )
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, roe, grossprofit_margin, or_yoy
+                FROM ts_fina_indicator WHERE end_date = '{end_date}'
+                """)
         except Exception as exc:
             logger.warning(f"读取 fina_indicator 失败: {exc}")
             return []
@@ -69,27 +63,23 @@ class FundamentalMultifactorStrategy(BaseStrategy):
 
         # PE 打分（取最近一个交易日的 PE）
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                latest_date = conn.execute(
-                    "SELECT MAX(date) FROM daily_basic"
-                ).fetchone()[0]
-                if latest_date:
-                    pe_df = pd.read_sql(
-                        f"""
-                        SELECT symbol, pe_ttm FROM daily_basic
-                        WHERE date = '{latest_date}'
-                        """,
-                        conn,
-                    )
-                    if not pe_df.empty:
-                        pe_df = pe_df.dropna(subset=["pe_ttm"])
-                        pe_df["pe_score"] = pe_df["pe_ttm"].clip(upper=100).rank(pct=True, ascending=False)
-                        df = df.merge(pe_df[["symbol", "pe_score"]], on="symbol", how="left")
-                        df["pe_score"] = df["pe_score"].fillna(0)
-                    else:
-                        df["pe_score"] = 0
+            latest_date = self.engine.fetch_one("SELECT MAX(trade_date) FROM ts_daily_basic")
+            if latest_date:
+                pe_df = self.engine.query(
+                    f"""
+                    SELECT ts_code, pe_ttm FROM ts_daily_basic
+                    WHERE trade_date = '{latest_date}'
+                    """
+                )
+                if not pe_df.empty:
+                    pe_df = pe_df.dropna(subset=["pe_ttm"])
+                    pe_df["pe_score"] = pe_df["pe_ttm"].clip(upper=100).rank(pct=True, ascending=False)
+                    df = df.merge(pe_df[["ts_code", "pe_score"]], on="ts_code", how="left")
+                    df["pe_score"] = df["pe_score"].fillna(0)
                 else:
                     df["pe_score"] = 0
+            else:
+                df["pe_score"] = 0
         except Exception:
             df["pe_score"] = 0
 
@@ -97,6 +87,6 @@ class FundamentalMultifactorStrategy(BaseStrategy):
         df["total"] = (df["roe_score"] + df["gm_score"] + df["rev_score"] + df["pe_score"]) / 4
         df = df.sort_values("total", ascending=False)
 
-        selected = df.head(self._TOP_N)["symbol"].tolist()
+        selected = df.head(self._TOP_N)["ts_code"].tolist()
         logger.info(f"FundamentalMultifactorStrategy 选出 {len(selected)} 只股票")
         return selected

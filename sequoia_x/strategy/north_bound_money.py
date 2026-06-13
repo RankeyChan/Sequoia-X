@@ -1,7 +1,5 @@
 """北向资金持续买入策略：跟踪外资动向，捕捉外资持续流入标的。"""
 
-import sqlite3
-
 import numpy as np
 import pandas as pd
 
@@ -9,7 +7,6 @@ from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class NorthBoundMoneyStrategy(BaseStrategy):
     """北向资金持续买入策略。
@@ -33,16 +30,15 @@ class NorthBoundMoneyStrategy(BaseStrategy):
             return []
 
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                cnt = conn.execute("SELECT COUNT(*) FROM hk_hold").fetchone()[0]
-                if cnt == 0:
-                    logger.info("NorthBoundMoney: hk_hold 表无数据")
-                    return []
+            cnt = self.engine.fetch_one("SELECT COUNT(*) FROM ts_hk_hold")
+            if cnt == 0:
+                logger.info("NorthBoundMoney: hk_hold 表无数据")
+                return []
 
-                # 获取所有股票和最新持股数据
-                stock_symbols = conn.execute(
-                    "SELECT DISTINCT symbol FROM hk_hold"
-                ).fetchall()
+            # 获取所有股票和最新持股数据
+            stock_symbols = self.engine.fetch_all(
+                "SELECT DISTINCT ts_code FROM ts_hk_hold"
+            )
         except Exception as exc:
             logger.warning(f"读取数据失败: {exc}")
             return []
@@ -51,14 +47,13 @@ class NorthBoundMoneyStrategy(BaseStrategy):
         selected: list[str] = []
         for (symbol,) in stock_symbols:
             try:
-                with sqlite3.connect(self.engine.db_path) as conn:
-                    rows = conn.execute(
-                        f"""
-                        SELECT date, ratio FROM hk_hold
-                        WHERE symbol = ? ORDER BY date DESC LIMIT {self._LOOKBACK_DAYS}
-                        """,
-                        (symbol,),
-                    ).fetchall()
+                rows = self.engine.fetch_all(
+                    f"""
+                    SELECT trade_date, ratio FROM ts_hk_hold
+                    WHERE ts_code = %s ORDER BY trade_date DESC LIMIT {self._LOOKBACK_DAYS}
+                    """,
+                    (symbol,),
+                )
 
                 if len(rows) < self._LOOKBACK_DAYS:
                     continue

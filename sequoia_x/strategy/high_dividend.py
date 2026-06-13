@@ -1,14 +1,11 @@
 """高股息红利策略：股息率高分位 + 低 PE + 低波动，适合熊市防御。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class HighDividendStrategy(BaseStrategy):
     """高股息红利策略。
@@ -31,20 +28,17 @@ class HighDividendStrategy(BaseStrategy):
             return []
 
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                latest = conn.execute(
-                    "SELECT MAX(date) FROM daily_basic"
-                ).fetchone()[0]
-                if not latest:
-                    return []
+            latest = self.engine.fetch_one(
+                "SELECT MAX(trade_date) FROM ts_daily_basic"
+            )
+            if not latest:
+                return []
 
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, dv_ratio, pe_ttm, pb, circ_mv
-                    FROM daily_basic WHERE date = '{latest}'
-                    """,
-                    conn,
-                )
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, dv_ratio, pe_ttm, pb, circ_mv
+                FROM ts_daily_basic WHERE trade_date = '{latest}'
+                """)
         except Exception as exc:
             logger.warning(f"读取数据失败: {exc}")
             return []
@@ -69,6 +63,6 @@ class HighDividendStrategy(BaseStrategy):
         # 按股息率排序
         df = df.sort_values("dv_ratio", ascending=False)
 
-        selected = df.head(20)["symbol"].tolist()
+        selected = df.head(20)["ts_code"].tolist()
         logger.info(f"HighDividendStrategy 选出 {len(selected)} 只股票")
         return selected

@@ -1,7 +1,5 @@
 """海龟交易策略：20日新高突破 + 成交额过亿 + 动量阳线过滤 + 基本面筛选。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
@@ -9,7 +7,6 @@ from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
-
 
 class TurtleTradeStrategy(BaseStrategy):
     """海龟交易策略（A股防诱多改良版 + Tushare 基本面增强）。
@@ -32,17 +29,16 @@ class TurtleTradeStrategy(BaseStrategy):
         """从本地 daily_basic 表查询流通市值。"""
         if not symbols:
             return {}
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                rows = conn.execute(
-                    f"""
-                    SELECT symbol, circ_mv FROM daily_basic
-                    WHERE symbol IN ({placeholders})
-                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
-                    """,
-                    symbols,
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                f"""
+                SELECT ts_code, circ_mv FROM ts_daily_basic
+                WHERE ts_code IN ({placeholders})
+                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
+                """,
+                symbols,
+            )
             return {r[0]: r[1] or 0 for r in rows}
         except Exception:
             return {}

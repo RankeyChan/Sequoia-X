@@ -1,6 +1,5 @@
 """机构追踪策略：综合龙虎榜机构买入 + 机构调研记录，捕捉机构关注信号。"""
 
-import sqlite3
 from datetime import date, timedelta
 
 import pandas as pd
@@ -10,7 +9,6 @@ from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
-
 
 class InstitutionalStrategy(BaseStrategy):
     """机构追踪策略。
@@ -37,18 +35,17 @@ class InstitutionalStrategy(BaseStrategy):
         """获取近5日龙虎榜有机构净买入的股票列表。"""
         cutoff = (date.today() - timedelta(days=self._INST_LOOKBACK)).strftime("%Y%m%d")
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                # 只取机构（排除游资）
-                rows = conn.execute(
-                    """
-                    SELECT DISTINCT symbol FROM top_inst
-                    WHERE date >= ?
-                    AND side = '买入'
-                    AND net_buy > 0
-                    AND (exalter LIKE '%机构%' OR exalter LIKE '%专用%')
-                    """,
-                    (cutoff,),
-                ).fetchall()
+            # 只取机构（排除游资）
+            rows = self.engine.fetch_all(
+                """
+                SELECT DISTINCT ts_code FROM ts_top_inst
+                WHERE trade_date >= %s
+                AND side = '买入'
+                AND net_buy > 0
+                AND (exalter LIKE '%机构%' OR exalter LIKE '%专用%')
+                """,
+                (cutoff,),
+            )
             return {r[0] for r in rows}
         except Exception:
             return set()
@@ -58,15 +55,14 @@ class InstitutionalStrategy(BaseStrategy):
         # 尝试从本地 top_list 表获取（如果存了 reason 包含调研）
         cutoff = (date.today() - timedelta(days=self._SURV_LOOKBACK)).strftime("%Y%m%d")
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                # 从龙虎榜 reason 字段找调研相关
-                rows = conn.execute(
-                    """
-                    SELECT DISTINCT symbol FROM top_list
-                    WHERE date >= ? AND reason LIKE '%调研%'
-                    """,
-                    (cutoff,),
-                ).fetchall()
+            # 从龙虎榜 reason 字段找调研相关
+            rows = self.engine.fetch_all(
+                """
+                SELECT DISTINCT ts_code FROM ts_top_list
+                WHERE trade_date >= %s AND reason LIKE '%调研%'
+                """,
+                (cutoff,),
+            )
             return {r[0] for r in rows}
         except Exception:
             return set()

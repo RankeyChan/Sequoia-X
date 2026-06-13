@@ -22,7 +22,8 @@ socket.setdefaulttimeout(10.0)
 
 from sequoia_x.core.config import get_settings
 from sequoia_x.core.logger import get_logger
-from sequoia_x.data.engine import DataEngine
+from sequoia_x.data.mysql_engine import MySQLEngine
+import sequoia_x.data.mysql_sync  # noqa: F401  — 注册同步方法
 from sequoia_x.notify.feishu import FeishuNotifier
 from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.high_tight_flag import HighTightFlagStrategy
@@ -108,7 +109,7 @@ def main() -> None:
         logger = get_logger(__name__)
         logger.info("Sequoia-X V2 启动 (Tushare)")
 
-        engine = DataEngine(settings)
+        engine = MySQLEngine(settings)
 
         # ── 单表同步模式 ──
         if args.sync_table:

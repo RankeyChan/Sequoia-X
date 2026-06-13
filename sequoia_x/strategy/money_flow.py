@@ -1,7 +1,5 @@
 """主力资金持续流入策略：跟踪大单资金动向，捕捉主力建仓信号。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
@@ -9,7 +7,6 @@ from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
-
 
 class MoneyFlowStrategy(BaseStrategy):
     """主力资金持续流入策略。
@@ -34,22 +31,20 @@ class MoneyFlowStrategy(BaseStrategy):
         """从 moneyflow 表获取近5日资金流向数据。"""
         if not symbols:
             return pd.DataFrame()
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, date, buy_elg_amount, sell_elg_amount,
-                           buy_lg_amount, sell_lg_amount,
-                           buy_sm_amount, sell_sm_amount,
-                           net_mf_amount
-                    FROM moneyflow
-                    WHERE symbol IN ({placeholders})
-                    ORDER BY date DESC
-                    """,
-                    conn,
-                    params=symbols,
-                )
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, trade_date, buy_elg_amount, sell_elg_amount,
+                       buy_lg_amount, sell_lg_amount,
+                       buy_sm_amount, sell_sm_amount,
+                       net_mf_amount
+                FROM ts_moneyflow
+                WHERE ts_code IN ({placeholders})
+                ORDER BY trade_date DESC
+                """,
+                params=symbols,
+            )
             return df
         except Exception as exc:
             logger.warning(f"读取 moneyflow 失败: {exc}")
@@ -76,7 +71,7 @@ class MoneyFlowStrategy(BaseStrategy):
 
         for symbol in symbols:
             try:
-                stock_mf = mf_df[mf_df["symbol"] == symbol].head(self._LOOKBACK_DAYS)
+                stock_mf = mf_df[mf_df["ts_code"] == symbol].head(self._LOOKBACK_DAYS)
                 if len(stock_mf) < self._LOOKBACK_DAYS:
                     continue
 

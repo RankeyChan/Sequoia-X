@@ -1,9 +1,14 @@
 """策略基类模块：定义所有选股策略的抽象接口。"""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from sequoia_x.core.config import Settings
-from sequoia_x.data.engine import DataEngine
+
+if TYPE_CHECKING:
+    from sequoia_x.data.mysql_engine import MySQLEngine
 
 
 class BaseStrategy(ABC):
@@ -19,12 +24,12 @@ class BaseStrategy(ABC):
     webhook_key: str = "default"
     name_cn: str = ""
 
-    def __init__(self, engine: DataEngine, settings: Settings) -> None:
+    def __init__(self, engine: MySQLEngine, settings: Settings) -> None:
         """
         初始化策略。
 
         Args:
-            engine: DataEngine 实例，用于读取行情数据。
+            engine: MySQLEngine 实例，用于读取行情数据。
             settings: Settings 实例，用于读取配置。
         """
         self.engine = engine

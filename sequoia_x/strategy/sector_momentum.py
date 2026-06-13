@@ -1,6 +1,5 @@
 """行业动量策略：先识别强势行业，再从中筛选趋势动量个股。"""
 
-import sqlite3
 from datetime import date, timedelta
 
 import numpy as np
@@ -10,7 +9,6 @@ from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class SectorMomentumStrategy(BaseStrategy):
     """行业动量策略（融合行业轮动 + 趋势动量）。
@@ -92,10 +90,9 @@ class SectorMomentumStrategy(BaseStrategy):
 
         # ── 第二步：行业轮动分析 ──
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                rows = conn.execute(
-                    "SELECT symbol, industry FROM stock_basic WHERE industry IS NOT NULL"
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                "SELECT ts_code, industry FROM ts_stock_basic WHERE industry IS NOT NULL"
+            )
         except Exception as exc:
             logger.warning(f"读取行业数据失败: {exc}")
             return []

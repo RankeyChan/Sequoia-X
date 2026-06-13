@@ -4,7 +4,6 @@
 可区分主板(10%)/创业板科创板(20%)的不同涨停幅度。
 """
 
-import sqlite3
 from datetime import date, timedelta
 
 import pandas as pd
@@ -14,7 +13,6 @@ from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
-
 
 class LimitUpShakeoutStrategy(BaseStrategy):
     """涨停洗盘策略（Tushare 增强版）。
@@ -38,11 +36,10 @@ class LimitUpShakeoutStrategy(BaseStrategy):
         """从 limit_list 表获取昨日真实涨停的股票列表。"""
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                rows = conn.execute(
-                    "SELECT symbol FROM limit_list WHERE date = ? AND limit_type = 'U'",
-                    (yesterday,),
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                "SELECT ts_code FROM ts_limit_list_d WHERE trade_date = %s AND limit_type = 'U'",
+                (yesterday,),
+            )
             return {r[0] for r in rows}
         except Exception:
             return set()

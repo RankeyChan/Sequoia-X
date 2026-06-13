@@ -1,6 +1,5 @@
 """净利润断层策略：业绩预告净利润增长>50% + PE合理，捕捉财报超预期机会。"""
 
-import sqlite3
 from datetime import date, timedelta
 
 import pandas as pd
@@ -9,7 +8,6 @@ from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class EarningsSurpriseStrategy(BaseStrategy):
     """净利润断层策略。
@@ -36,25 +34,22 @@ class EarningsSurpriseStrategy(BaseStrategy):
             return []
 
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                # 确保 forecast 表有数据
-                cnt = conn.execute("SELECT COUNT(*) FROM forecast").fetchone()[0]
-                if cnt == 0:
-                    logger.info("EarningsSurprise: forecast 表无数据")
-                    return []
+            # 确保 forecast 表有数据
+            cnt = self.engine.fetch_one("SELECT COUNT(*) FROM ts_forecast")
+            if cnt is None or cnt == 0:
+                logger.info("EarningsSurprise: forecast 表无数据")
+                return []
 
-                cutoff = (date.today() - timedelta(days=self._LOOKBACK_DAYS)).strftime("%Y%m%d")
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, end_date, type, p_change_max, p_change_min,
-                           net_profit_min, net_profit_max, ann_date, summary
-                    FROM forecast
-                    WHERE ann_date >= '{cutoff}'
-                      AND (p_change_min >= 50 OR p_change_max >= 50)
-                    ORDER BY p_change_max DESC
-                    """,
-                    conn,
-                )
+            cutoff = (date.today() - timedelta(days=self._LOOKBACK_DAYS)).strftime("%Y%m%d")
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, end_date, `type`, p_change_max, p_change_min,
+                       net_profit_min, net_profit_max, ann_date, summary
+                FROM ts_forecast
+                WHERE ann_date >= '{cutoff}'
+                  AND (p_change_min >= 50 OR p_change_max >= 50)
+                ORDER BY p_change_max DESC
+                """)
         except Exception as exc:
             logger.warning(f"读取数据失败: {exc}")
             return []
@@ -66,14 +61,13 @@ class EarningsSurpriseStrategy(BaseStrategy):
         # PE 过滤
         selected: list[str] = []
         for _, row in df.iterrows():
-            symbol = row["symbol"]
+            symbol = row["ts_code"]
             try:
-                with sqlite3.connect(self.engine.db_path) as conn:
-                    pe = conn.execute(
-                        "SELECT pe_ttm FROM daily_basic WHERE symbol = ? ORDER BY date DESC LIMIT 1",
-                        (symbol,),
-                    ).fetchone()
-                if pe and pe[0] and 0 < pe[0] < 100:
+                pe = self.engine.fetch_one(
+                    "SELECT pe_ttm FROM ts_daily_basic WHERE ts_code = %s ORDER BY trade_date DESC LIMIT 1",
+                    (symbol,),
+                )
+                if pe is not None and 0 < pe < 100:
                     selected.append(symbol)
             except Exception:
                 continue

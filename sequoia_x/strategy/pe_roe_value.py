@@ -1,14 +1,11 @@
 """PE-ROE 价值选股策略：PE最低20% + ROE最高30% + PB最低30% 综合评分。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class PeRoeValueStrategy(BaseStrategy):
     """PE-ROE 价值选股策略。
@@ -34,21 +31,18 @@ class PeRoeValueStrategy(BaseStrategy):
             return []
 
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                # 获取最新交易日数据
-                latest = conn.execute(
-                    "SELECT MAX(date) FROM daily_basic"
-                ).fetchone()[0]
-                if not latest:
-                    return []
+            # 获取最新交易日数据
+            latest = self.engine.fetch_one(
+                "SELECT MAX(trade_date) FROM ts_daily_basic"
+            )
+            if not latest:
+                return []
 
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, pe_ttm, pb, circ_mv
-                    FROM daily_basic WHERE date = '{latest}'
-                    """,
-                    conn,
-                )
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, pe_ttm, pb, circ_mv
+                FROM ts_daily_basic WHERE trade_date = '{latest}'
+                """)
         except Exception as exc:
             logger.warning(f"读取数据失败: {exc}")
             return []
@@ -74,23 +68,20 @@ class PeRoeValueStrategy(BaseStrategy):
 
         # ROE 从 fina_indicator 获取
         try:
-            conn = sqlite3.connect(self.engine.db_path)
-            latest_roe = conn.execute(
-                "SELECT MAX(end_date) FROM fina_indicator"
-            ).fetchone()[0]
+            latest_roe = self.engine.fetch_one(
+                "SELECT MAX(end_date) FROM ts_fina_indicator"
+            )
             if latest_roe:
-                roe_df = pd.read_sql(
+                roe_df = self.engine.query(
                     f"""
-                    SELECT symbol, roe FROM fina_indicator
+                    SELECT ts_code, roe FROM ts_fina_indicator
                     WHERE end_date = '{latest_roe}'
-                    """,
-                    conn,
-                )
+                    """)
                 roe_df = roe_df.dropna(subset=["roe"])
                 if not roe_df.empty:
                     roe_top = roe_df["roe"].quantile(1 - self._PERCENTILE)
                     roe_df["roe_score"] = (roe_df["roe"] >= roe_top).astype(int)
-                    df = df.merge(roe_df[["symbol", "roe_score"]], on="symbol", how="left")
+                    df = df.merge(roe_df[["ts_code", "roe_score"]], on="ts_code", how="left")
                     df["roe_score"] = df["roe_score"].fillna(0)
                 else:
                     df["roe_score"] = 0
@@ -103,6 +94,6 @@ class PeRoeValueStrategy(BaseStrategy):
         df["total_score"] = df["pe_score"] + df["pb_score"] + df["roe_score"]
         df = df.sort_values("total_score", ascending=False)
 
-        selected = df.head(20)["symbol"].tolist()
+        selected = df.head(20)["ts_code"].tolist()
         logger.info(f"PeRoeValueStrategy 选出 {len(selected)} 只股票")
         return selected

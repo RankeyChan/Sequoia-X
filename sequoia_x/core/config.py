@@ -4,16 +4,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    db_path: str = "data/sequoia_v2.db"
     start_date: str = "2024-01-01"
     feishu_webhook_url: str  # 必填字段，缺失时抛出 ValidationError
     strategy_webhooks: dict[str, str] = {}
 
-    # ── Tushare 配置 ──
     # ── Tushare 配置（唯一数据源）──
     tushare_token: str = ""         # Tushare API token（必填）
     tushare_proxy_url: str = ""     # 代理地址，如 http://8.148.76.181:8686/
-    tushare_max_workers: int = 5    # API 最大并发数
+
+    # ── MySQL 配置 ──
+    mysql_host: str = "127.0.0.1"
+    mysql_port: int = 3306
+    mysql_user: str = "root"
+    mysql_password: str = ""
+    mysql_database: str = "tushare"
 
     model_config = SettingsConfigDict(
         env_file=".env",

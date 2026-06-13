@@ -1,11 +1,8 @@
 """基本面过滤器：PE/PB/市值/换手率/ST 筛选，可在任意策略中作为前置条件。"""
 
-import sqlite3
-
 from sequoia_x.core.logger import get_logger
 
 logger = get_logger(__name__)
-
 
 class FundamentalFilter:
     """基本面过滤器。
@@ -19,24 +16,23 @@ class FundamentalFilter:
         symbols = filter.filter_by_pe(symbols, max_pe=50)
     """
 
-    def __init__(self, engine: "DataEngine") -> None:  # noqa: F821
-        self.db_path = engine.db_path
+    def __init__(self, engine: "MySQLEngine") -> None:  # noqa: F821
+        self.engine = engine
 
     def _get_pe_map(self, symbols: list[str]) -> dict[str, float]:
         """获取最新 PE（TTM）。"""
         if not symbols:
             return {}
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                rows = conn.execute(
-                    f"""
-                    SELECT symbol, pe_ttm FROM daily_basic
-                    WHERE symbol IN ({placeholders})
-                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
-                    """,
-                    symbols,
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                f"""
+                SELECT ts_code, pe_ttm FROM ts_daily_basic
+                WHERE ts_code IN ({placeholders})
+                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
+                """,
+                symbols,
+            )
             return {r[0]: r[1] or 0 for r in rows}
         except Exception:
             return {}
@@ -45,17 +41,16 @@ class FundamentalFilter:
         """获取最新 PB。"""
         if not symbols:
             return {}
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                rows = conn.execute(
-                    f"""
-                    SELECT symbol, pb FROM daily_basic
-                    WHERE symbol IN ({placeholders})
-                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
-                    """,
-                    symbols,
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                f"""
+                SELECT ts_code, pb FROM ts_daily_basic
+                WHERE ts_code IN ({placeholders})
+                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
+                """,
+                symbols,
+            )
             return {r[0]: r[1] or 0 for r in rows}
         except Exception:
             return {}
@@ -64,17 +59,16 @@ class FundamentalFilter:
         """获取最新流通市值。"""
         if not symbols:
             return {}
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                rows = conn.execute(
-                    f"""
-                    SELECT symbol, circ_mv FROM daily_basic
-                    WHERE symbol IN ({placeholders})
-                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
-                    """,
-                    symbols,
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                f"""
+                SELECT ts_code, circ_mv FROM ts_daily_basic
+                WHERE ts_code IN ({placeholders})
+                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
+                """,
+                symbols,
+            )
             return {r[0]: r[1] or 0 for r in rows}
         except Exception:
             return {}
@@ -83,17 +77,16 @@ class FundamentalFilter:
         """获取最新换手率。"""
         if not symbols:
             return {}
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                rows = conn.execute(
-                    f"""
-                    SELECT symbol, turnover_rate FROM daily_basic
-                    WHERE symbol IN ({placeholders})
-                    AND date = (SELECT MAX(date) FROM daily_basic WHERE symbol = daily_basic.symbol)
-                    """,
-                    symbols,
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                f"""
+                SELECT ts_code, turnover_rate FROM ts_daily_basic
+                WHERE ts_code IN ({placeholders})
+                AND trade_date = (SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code = ts_daily_basic.ts_code)
+                """,
+                symbols,
+            )
             return {r[0]: r[1] or 0 for r in rows}
         except Exception:
             return {}
@@ -101,16 +94,10 @@ class FundamentalFilter:
     def _get_st_stocks(self) -> set[str]:
         """获取当前 ST 股票列表。"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                rows = conn.execute(
-                    "SELECT symbol FROM stock_daily WHERE symbol IN "
-                    "(SELECT DISTINCT symbol FROM stock_daily) AND symbol LIKE '000%' "
-                    "LIMIT 0"
-                ).fetchall()
-            # 通过 name 字段识别 ST（如果 stock_basic 表有数据）
-            rows = conn.execute(
-                "SELECT symbol FROM stock_basic WHERE name LIKE '%ST%'"
-            ).fetchall()
+            # 通过 name 字段识别 ST
+            rows = self.engine.fetch_all(
+                "SELECT ts_code FROM ts_stock_basic WHERE name LIKE '%ST%'"
+            )
             return {r[0] for r in rows}
         except Exception:
             return set()

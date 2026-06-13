@@ -1,7 +1,5 @@
 """北向资金持续增持策略：跟踪外资（北向资金）持股变化，捕捉外资青睐个股。"""
 
-import sqlite3
-
 import numpy as np
 import pandas as pd
 
@@ -10,7 +8,6 @@ from sequoia_x.strategy.base import BaseStrategy
 from sequoia_x.strategy.filters import FundamentalFilter
 
 logger = get_logger(__name__)
-
 
 class NorthBoundStrategy(BaseStrategy):
     """北向资金持续增持策略。
@@ -35,19 +32,17 @@ class NorthBoundStrategy(BaseStrategy):
         """从 hk_hold 表获取近10日北向资金持股数据。"""
         if not symbols:
             return pd.DataFrame()
-        placeholders = ",".join("?" * len(symbols))
+        placeholders = ",".join(["%s"] * len(symbols))
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                df = pd.read_sql(
-                    f"""
-                    SELECT symbol, date, ratio
-                    FROM hk_hold
-                    WHERE symbol IN ({placeholders})
-                    ORDER BY date ASC
-                    """,
-                    conn,
-                    params=symbols,
-                )
+            df = self.engine.query(
+                f"""
+                SELECT ts_code, trade_date, ratio
+                FROM ts_hk_hold
+                WHERE ts_code IN ({placeholders})
+                ORDER BY trade_date ASC
+                """,
+                params=symbols,
+            )
             return df
         except Exception as exc:
             logger.warning(f"读取 hk_hold 失败: {exc}")
@@ -70,14 +65,14 @@ class NorthBoundStrategy(BaseStrategy):
             return []
 
         # 过滤出有连续数据的股票
-        symbol_counts = hk_df.groupby("symbol").size()
+        symbol_counts = hk_df.groupby("ts_code").size()
         valid_symbols = symbol_counts[symbol_counts >= self._LOOKBACK_DAYS].index.tolist()
 
         selected: list[str] = []
 
         for symbol in valid_symbols:
             try:
-                stock_data = hk_df[hk_df["symbol"] == symbol].tail(self._LOOKBACK_DAYS)
+                stock_data = hk_df[hk_df["ts_code"] == symbol].tail(self._LOOKBACK_DAYS)
                 if len(stock_data) < self._LOOKBACK_DAYS:
                     continue
 

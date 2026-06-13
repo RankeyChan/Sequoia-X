@@ -1,0 +1,667 @@
+"""MySQL 数据同步：日频数据同步、回填。
+
+通过 monkey-patch 注册到 MySQLEngine 上。
+仅同步 DDL 中已有的表。
+"""
+
+from __future__ import annotations
+
+import hashlib
+from datetime import date
+
+import pandas as pd
+import pymysql
+
+from sequoia_x.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+# ── MySQL 写入 ──
+
+
+def _compute_row_hash(values: list) -> str:
+    """计算一行所有字段值的 MD5 哈希，用于去重。"""
+    parts: list[str] = []
+    for v in values:
+        if v is None:
+            parts.append("\0")
+        else:
+            parts.append(str(v))
+    return hashlib.md5("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _write_mysql(conn: pymysql.Connection, table: str, df: pd.DataFrame) -> int:
+    """MD5 哈希去重写入 MySQL。
+
+    对每行数据计算全字段 MD5，利用 row_hash 列的 UNIQUE KEY 自动去重：
+    - 完全重复（同 hash）→ 跳过
+    - 任一字段不同（hash 不同）→ 插入新行
+
+    若表尚无 row_hash 列，自动降级为普通 INSERT。
+    """
+    if df.empty:
+        return 0
+    df = df.where(pd.notnull(df), None)
+
+    with conn.cursor() as cur:
+        cur.execute(f"SHOW COLUMNS FROM `{table}`")
+        table_cols = {r[0] for r in cur.fetchall()}
+    # 只取 DataFrame 与表中匹配的列，排除 id / row_hash
+    available = [c for c in df.columns if c in table_cols and c not in ("id", "row_hash")]
+    if not available:
+        return 0
+
+    has_row_hash = "row_hash" in table_cols
+
+    if has_row_hash:
+        # ── 方案 C：哈希去重 ──
+        cols = "`row_hash`, " + ", ".join(f"`{c}`" for c in available)
+        placeholders = ", ".join(["%s"] * (1 + len(available)))
+        sql = f"INSERT IGNORE INTO `{table}` ({cols}) VALUES ({placeholders})"
+
+        rows: list[tuple] = []
+        for _, row in df[available].iterrows():
+            vals = [
+                None if (isinstance(row[c], float) and pd.isna(row[c])) or row[c] is None
+                else row[c]
+                for c in available
+            ]
+            row_hash = _compute_row_hash(vals)
+            rows.append((row_hash, *vals))
+
+        with conn.cursor() as cur:
+            cur.executemany(sql, rows)
+        inserted = cur.rowcount
+    else:
+        # ── 降级：普通 INSERT ──
+        cols = ", ".join(f"`{c}`" for c in available)
+        placeholders = ", ".join(["%s"] * len(available))
+        sql = f"INSERT INTO `{table}` ({cols}) VALUES ({placeholders})"
+
+        rows: list[tuple] = []
+        for _, row in df[available].iterrows():
+            vals = [
+                None if (isinstance(row[c], float) and pd.isna(row[c])) or row[c] is None
+                else row[c]
+                for c in available
+            ]
+            rows.append(tuple(vals))
+
+        with conn.cursor() as cur:
+            cur.executemany(sql, rows)
+        inserted = len(rows)
+
+    logger.debug(f"[{table}] 写入 {inserted} 行（跳过 {len(df) - inserted} 条重复）")
+    return inserted
+
+
+# ══════════════════════════════════════════════════════════════════════
+# API 分类（按同步频率）
+# ══════════════════════════════════════════════════════════════════════
+
+# 每日同步：日线、资金流向、涨跌停、龙虎榜等
+_DAILY_APIS = [
+    ("get_daily", "ts_daily", {"vol": "volume"}),
+    ("get_daily_basic", "ts_daily_basic", {}),
+    ("get_moneyflow", "ts_moneyflow", {}),
+    ("get_margin_detail", "ts_margin_detail", {}),
+    ("get_limit_list", "ts_limit_list_d", {}),
+    ("get_top_list", "ts_top_list", {}),
+    ("get_top_inst", "ts_top_inst", {}),
+    ("get_hk_hold", "ts_hk_hold", {}),
+    ("get_block_trade", "ts_block_trade", {}),
+    ("get_stk_limit", "ts_stk_limit", {}),
+    ("get_adj_factor", "ts_adj_factor", {}),
+    ("get_hsgt_top10", "ts_hsgt_top10", {}),
+    ("get_moneyflow_hsgt", "ts_moneyflow_hsgt", {}),
+    ("get_suspend_d", "ts_suspend_d", {}),
+    ("get_cyq_perf", "ts_cyq_perf", {}),
+    ("get_moneyflow_ths", "ts_moneyflow_ths", {}),
+    ("get_moneyflow_dc", "ts_moneyflow_dc", {}),
+    ("get_moneyflow_cnt_ths", "ts_moneyflow_cnt_ths", {}),
+    ("get_moneyflow_ind_ths", "ts_moneyflow_ind_ths", {}),
+    ("get_moneyflow_ind_dc", "ts_moneyflow_ind_dc", {}),
+    ("get_moneyflow_mkt_dc", "ts_moneyflow_mkt_dc", {}),
+    ("get_ggt_top10", "ts_ggt_top10", {}),
+    ("get_ths_hot", "ts_ths_hot", {}),
+    ("get_dc_hot", "ts_dc_hot", {}),
+    ("get_kpl_list", "ts_kpl_list", {}),
+    ("get_limit_list_ths", "ts_limit_list_ths", {}),
+    ("get_hm_detail", "ts_hm_detail", {}),
+]
+
+# 每周最后交易日同步
+_WEEKLY_APIS = [
+    ("get_weekly", "ts_weekly", {}),
+]
+
+# 每月最后交易日同步
+_MONTHLY_APIS = [
+    ("get_monthly", "ts_monthly", {}),
+]
+
+# 周月线（每日调用，需传 freq 参数）
+_WEEK_MONTH_FREQ_APIS = [
+    ("get_stk_weekly_monthly", "ts_stk_weekly_monthly", {}),
+    ("get_stk_week_month_adj", "ts_stk_week_month_adj", {}),
+]
+
+# 财务数据（VIP 接口，period 一次返回全量）
+_FINANCIAL_VIP = [
+    "income_vip", "balancesheet_vip", "cashflow_vip",
+    "forecast_vip", "express_vip", "fina_indicator_vip",
+    "fina_mainbz_vip",
+]
+
+# 仍保留非 VIP 的逐股财务
+_FINANCIAL_PER_STOCK = [
+    "dividend", "fina_audit",
+]
+
+# 保留但不自动同步
+_RESERVED_APIS = {
+    "rt_k", "rt_min", "rt_min_daily",
+    "stk_auction", "stk_auction_c", "stk_auction_o",
+    "stk_premarket",
+}
+
+# ══════════════════════════════════════════════════════════════════════
+# 日期工具
+# ══════════════════════════════════════════════════════════════════════
+
+def _is_last_trade_day(trade_date: str, freq: str = "month") -> bool:
+    """检查 trade_date 是否为当月/周最后一个交易日。"""
+    conn = _get_global_conn()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            if freq == "week":
+                cur.execute(
+                    "SELECT MAX(cal_date) FROM ts_trade_cal WHERE is_open='1' "
+                    "AND YEARWEEK(cal_date,1) = YEARWEEK(%s,1)", (trade_date,)
+                )
+            else:
+                cur.execute(
+                    "SELECT MAX(cal_date) FROM ts_trade_cal WHERE is_open='1' "
+                    "AND SUBSTRING(cal_date,1,6) = SUBSTRING(%s,1,6)", (trade_date,)
+                )
+            row = cur.fetchone()
+            return row is not None and row[0] == trade_date
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
+def _get_global_conn():
+    """获取临时 MySQL 连接（用于日期查询）。"""
+    try:
+        from sequoia_x.core.config import get_settings
+        s = get_settings()
+        return pymysql.connect(
+            host=s.mysql_host, port=s.mysql_port,
+            user=s.mysql_user, password=s.mysql_password,
+            database=s.mysql_database, charset="utf8mb4",
+        )
+    except Exception:
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 同步执行器
+# ══════════════════════════════════════════════════════════════════════
+
+def _sync_task_list(self, tasks: list, trade_date: str) -> dict[str, int]:
+    """执行一批同步任务，返回 {table: count}。"""
+    import time as _tm
+    result: dict[str, int] = {}
+    for api_method, table, rename in tasks:
+        try:
+            method = getattr(self.tushare, api_method)
+            try:
+                df = method(trade_date=trade_date)
+            except TypeError:
+                try:
+                    df = method(trade_date)
+                except Exception:
+                    continue
+            if df is not None and not df.empty:
+                if rename:
+                    df = df.rename(columns=rename)
+                conn = self._get_conn()
+                try:
+                    result[table] = _write_mysql(conn, table, df)
+                finally:
+                    conn.close()
+        except Exception:
+            pass
+        _tm.sleep(0.12)
+    return result
+
+
+def _sync_week_month_freq(self, trade_date: str) -> dict[str, int]:
+    """同步周月线表（每日调用，分别传 freq=week 和 freq=month）。"""
+    import time as _tm
+    result: dict[str, int] = {}
+    for api_method, table, _ in _WEEK_MONTH_FREQ_APIS:
+        for freq in ("week", "month"):
+            try:
+                method = getattr(self.tushare, api_method)
+                df = method(trade_date=trade_date, freq=freq)
+                if df is not None and not df.empty:
+                    conn = self._get_conn()
+                    try:
+                        result[table] = result.get(table, 0) + _write_mysql(conn, table, df)
+                    finally:
+                        conn.close()
+            except Exception:
+                pass
+            _tm.sleep(0.12)
+    return result
+
+
+def _sync_financial(self, trade_date: str = "") -> dict[str, int]:
+    """同步财务数据（每月最后交易日）。
+
+    分两类：
+    - VIP（period 一次性取全量）
+    - 逐股（ts_code 必填）
+    """
+    import time as _tm
+    result: dict[str, int] = {}
+
+    # ── 从交易日推算最近季度末 ──
+    if not trade_date:
+        trade_date = date.today().strftime("%Y%m%d")
+    y, m = int(trade_date[:4]), int(trade_date[4:6])
+    if m <= 3:
+        period = f"{y-1}1231"
+    elif m <= 6:
+        period = f"{y}0331"
+    elif m <= 9:
+        period = f"{y}0630"
+    else:
+        period = f"{y}0930"
+
+    # ── 1. VIP + 批量同步（一次性取全量）──
+    for api_name in _FINANCIAL_VIP:
+        method = getattr(self.tushare, f"get_{api_name}", None)
+        if method is None:
+            continue
+
+        table = f"ts_{api_name.replace('_vip', '')}"
+        try:
+            df = method(period=period)
+        except Exception:
+            continue
+        if df is not None and not df.empty:
+            conn = self._get_conn()
+            try:
+                result[table] = _write_mysql(conn, table, df)
+            finally:
+                conn.close()
+            logger.info(f"[财务] {api_name}: {len(df)} 行（全量）")
+            _tm.sleep(0.3)
+
+    # ── disclosure_date（end_date 一次返回全量）──
+    try:
+        df = self.tushare.get_disclosure_date(end_date=period)
+        if df is not None and not df.empty:
+            conn = self._get_conn()
+            try:
+                result["ts_disclosure_date"] = _write_mysql(conn, "ts_disclosure_date", df)
+            finally:
+                conn.close()
+            logger.info(f"[财务] disclosure_date: {len(df)} 行（全量）")
+    except Exception:
+        pass
+    _tm.sleep(0.3)
+
+    # ── stk_rewards（200 个 ts_code 一组批量调用）──
+    conn = self._get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT ts_code FROM ts_stock_basic")
+            all_codes = [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+    if all_codes:
+        frames = []
+        batch_size = 200
+        total = len(all_codes)
+        logger.info(f"[财务] stk_rewards: 批量同步 {total} 只（每批 {batch_size} 个）...")
+        for i in range(0, total, batch_size):
+            batch = all_codes[i:i + batch_size]
+            try:
+                df = self.tushare.get_stk_rewards(ts_code=",".join(batch), end_date=period)
+            except Exception:
+                continue
+            if df is not None and not df.empty:
+                frames.append(df)
+            _tm.sleep(0.3)
+            if (i + batch_size) % 1000 == 0:
+                logger.info(f"[财务] stk_rewards: {min(i+batch_size, total)}/{total}")
+        if frames:
+            all_df = pd.concat(frames, ignore_index=True)
+            conn = self._get_conn()
+            try:
+                result["ts_stk_rewards"] = _write_mysql(conn, "ts_stk_rewards", all_df)
+            finally:
+                conn.close()
+            logger.info(f"[财务] stk_rewards: 完成 {len(frames)} 批, 写入 {len(all_df)} 行")
+    _tm.sleep(0.3)
+
+    # ── 2. 逐股同步（剩余非 VIP 接口）──
+    conn = self._get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT ts_code FROM ts_stock_basic")
+            codes = [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+    if not codes:
+        logger.warning("无法获取股票列表，跳过逐股财务同步")
+        return result
+
+    total = len(codes)
+    for api_name in _FINANCIAL_PER_STOCK:
+        table = f"ts_{api_name}"
+        method = getattr(self.tushare, f"get_{api_name}", None)
+        if method is None:
+            continue
+
+        fail_count = 0
+        written = 0
+        logger.info(f"[财务] {api_name}: 逐股同步 {total} 只...")
+        for idx, ts_code in enumerate(codes):
+            _tm.sleep(0.5)
+            try:
+                if api_name in ("dividend", "stk_rewards"):
+                    df = method(ts_code=ts_code, end_date=period)
+                else:
+                    df = method(ts_code=ts_code, period=period)
+            except Exception:
+                fail_count += 1
+                if fail_count >= 5:
+                    _tm.sleep(10)
+                    fail_count = 0
+                continue
+            fail_count = 0
+            if df is not None and not df.empty:
+                conn = self._get_conn()
+                try:
+                    n = _write_mysql(conn, table, df)
+                    written += n
+                finally:
+                    conn.close()
+            if (idx + 1) % 500 == 0:
+                logger.info(f"[财务] {api_name}: {idx+1}/{total} ({written} 条)")
+        logger.info(f"[财务] {api_name}: 完成 {written} 条")
+
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 补齐缺失数据
+# ══════════════════════════════════════════════════════════════════════
+
+def _ensure_recent_data(self, trade_date: str) -> dict[str, int]:
+    if not self.tushare:
+        return {}
+    conn = self._get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT cal_date FROM ts_trade_cal WHERE is_open='1' ORDER BY cal_date DESC LIMIT 60"
+            )
+            target = [r[0] for r in cur.fetchall()]
+    finally:
+        conn.close()
+    if not target:
+        return {}
+
+    conn = self._get_conn()
+    try:
+        existing: set[str] = set()
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT DISTINCT trade_date FROM ts_daily WHERE trade_date >= '{target[-1]}'")
+            existing = {r[0] for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+    missing = [d for d in target if d not in existing]
+    if not missing:
+        return {}
+
+    logger.info(f"补齐缺失数据: {len(missing)} 个交易日")
+    total: dict[str, int] = {}
+    for md in missing:
+        cr = _sync_task_list(self, _DAILY_APIS, md)
+        for k, v in cr.items():
+            total[k] = total.get(k, 0) + v
+    return total
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 主入口：日常同步
+# ══════════════════════════════════════════════════════════════════════
+
+def sync_today(self, trade_date: str = "") -> dict[str, int]:
+    """日常同步：日线 + 周月线 + 月度/周度表 + 财务（按需）。"""
+    if not trade_date:
+        trade_date = date.today().strftime("%Y%m%d")
+    if not self.tushare:
+        return {}
+    result: dict[str, int] = {}
+
+    # 1. 每日同步
+    c = _sync_task_list(self, _DAILY_APIS, trade_date)
+    result.update(c)
+
+    # 3. 周月线（每日调用，freq=week + freq=month）
+    c = _sync_week_month_freq(self, trade_date)
+    result.update(c)
+
+    # 4. 周线表（每周最后交易日）
+    if _is_last_trade_day(trade_date, "week"):
+        logger.info(f"{trade_date} 是周最后交易日，同步周线表")
+        c = _sync_task_list(self, _WEEKLY_APIS, trade_date)
+        result.update(c)
+
+    # 5. 月线 + 财务（每月最后交易日）
+    if _is_last_trade_day(trade_date, "month"):
+        logger.info(f"{trade_date} 是月最后交易日，同步月线 + 财务表")
+        c = _sync_task_list(self, _MONTHLY_APIS, trade_date)
+        result.update(c)
+        c = _sync_financial(self)
+        result.update(c)
+
+    logger.info(f"sync_today({trade_date}): {dict(sorted(result.items()))}")
+    return result
+
+
+# ── 回填 ──
+
+def backfill_tushare(self, start: str = "2026-01-01") -> dict[str, int]:
+    if not self.tushare:
+        return {}
+    # 初始化基础数据
+    _init_tushare_basics(self)
+    _init_tushare_trade_cal(self, start.replace("-", ""), date.today().strftime("%Y%m%d"))
+    logger.info("开始 60 交易日数据补齐...")
+    result = _ensure_recent_data(self, date.today().strftime("%Y%m%d"))
+    logger.info(f"backfill done: {dict(sorted(result.items()))}")
+    return result
+
+
+def _init_tushare_basics(self) -> None:
+    conn = self._get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM ts_stock_basic")
+            if cur.fetchone()[0] > 0:
+                return
+    finally:
+        conn.close()
+    df = self.tushare.get_stock_basic()
+    if not df.empty:
+        conn = self._get_conn()
+        try:
+            _write_mysql(conn, "ts_stock_basic", df)
+        finally:
+            conn.close()
+
+
+def _init_tushare_trade_cal(self, start: str, end: str) -> None:
+    conn = self._get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM ts_trade_cal")
+            if cur.fetchone()[0] > 20:
+                return
+    finally:
+        conn.close()
+    df = self.tushare.get_trade_cal(start, end)
+    if not df.empty:
+        conn = self._get_conn()
+        try:
+            _write_mysql(conn, "ts_trade_cal", df)
+        finally:
+            conn.close()
+
+
+# ── 单表同步 ──
+
+def sync_table(self, table_name: str, trade_date: str = "") -> int:
+    """同步任意 ts_ 表。根据 API 类型自动选择参数策略。"""
+    if not self.tushare:
+        logger.error("Tushare 未启用")
+        return 0
+    if not trade_date:
+        trade_date = date.today().strftime("%Y%m%d")
+
+    # 自动补 ts_ 前缀
+    if not table_name.startswith("ts_"):
+        table_name = f"ts_{table_name}"
+
+    api_name = table_name.replace("ts_", "")
+
+    # 保留接口：不同步
+    if api_name in _RESERVED_APIS:
+        logger.info(f"[{table_name}] 保留接口，跳过同步")
+        return 0
+
+    logger.info(f"单表同步 [{table_name}] via {api_name} ({trade_date})...")
+
+    # ── 参数策略 ──
+    _MONTH_APIS = {"broker_recommend"}
+    _PER_STOCK_APIS = {"cyq_chips", "cyq_perf"} | set(_FINANCIAL_PER_STOCK)
+    _POSITIONAL_APIS = {
+        "stock_basic", "trade_cal", "concept", "concept_detail",
+        "namechange", "hs_const", "new_share", "bak_basic", "bse_mapping",
+        "stk_account", "stk_account_old", "stock_hsgt", "hm_list",
+        "ths_index", "ths_member", "tdx_index", "dc_index",
+    }
+
+    # ── 获取股票列表（供逐股循环使用）──
+    def _get_codes(engine) -> list[str]:
+        conn = engine._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT ts_code FROM ts_stock_basic")
+                return [r[0] for r in cur.fetchall()]
+        except Exception:
+            return []
+        finally:
+            conn.close()
+
+    # 检查 provider 是否有对应方法
+    df = pd.DataFrame()
+    method = getattr(self.tushare, f"get_{api_name}", None)
+    if method:
+        if api_name in _MONTH_APIS:
+            df = method(month=trade_date[:6])
+        elif api_name in _POSITIONAL_APIS:
+            try:
+                df = method()
+            except Exception:
+                pass
+        elif api_name in _PER_STOCK_APIS:
+            # ── 逐股循环同步 ──
+            codes = _get_codes(self)
+            if not codes:
+                logger.warning(f"[{table_name}] 无法获取股票列表")
+                return 0
+            frames = []
+            total_codes = len(codes)
+            logger.info(f"[{table_name}] 逐股同步 {total_codes} 只股票...")
+            for idx, ts_code in enumerate(codes):
+                try:
+                    chunk = method(ts_code=ts_code, trade_date=trade_date)
+                except TypeError:
+                    try:
+                        chunk = method(ts_code=ts_code)
+                    except Exception:
+                        continue
+                except Exception:
+                    continue
+                if chunk is not None and not chunk.empty:
+                    frames.append(chunk)
+                if (idx + 1) % 500 == 0:
+                    logger.info(f"[{table_name}] 进度: {idx + 1}/{total_codes}")
+                if (idx + 1) % 50 == 0:
+                    import time as _t
+                    _t.sleep(0.1)  # 控制 API 调用频率
+            if frames:
+                df = pd.concat(frames, ignore_index=True)
+            logger.info(f"[{table_name}] 逐股完成: {len(frames)} 只有数据")
+        else:
+            try:
+                df = method(trade_date=trade_date)
+            except TypeError:
+                try:
+                    df = method(trade_date)
+                except Exception:
+                    try:
+                        df = method()
+                    except Exception:
+                        pass
+
+    # 无 provider 方法，通过 SDK _call 直调
+    if df.empty and api_name not in _PER_STOCK_APIS:
+        if api_name in _MONTH_APIS:
+            df = self.tushare._call(api_name, month=trade_date[:6])
+        else:
+            try:
+                df = self.tushare._call(api_name, trade_date=trade_date)
+            except Exception:
+                df = pd.DataFrame()
+
+    if df.empty:
+        logger.info(f"[{table_name}] 无数据或API不支持")
+        return 0
+
+    conn = self._get_conn()
+    try:
+        count = _write_mysql(conn, table_name, df)
+    finally:
+        conn.close()
+    logger.info(f"[{table_name}] 写入 {count} 条")
+    return count
+
+
+# ── 注册 ──
+
+from sequoia_x.data.mysql_engine import MySQLEngine
+
+MySQLEngine._sync_task_list = _sync_task_list
+MySQLEngine._sync_week_month_freq = _sync_week_month_freq
+MySQLEngine._sync_financial = _sync_financial
+MySQLEngine._ensure_recent_data = _ensure_recent_data
+MySQLEngine.sync_today = sync_today
+MySQLEngine.sync_table = sync_table
+MySQLEngine.backfill_tushare = backfill_tushare

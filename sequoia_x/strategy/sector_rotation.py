@@ -1,6 +1,5 @@
 """行业轮动策略：识别近 N 日最强行业，精选行业内个股。"""
 
-import sqlite3
 from datetime import date, timedelta
 
 import pandas as pd
@@ -9,7 +8,6 @@ from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class SectorRotationStrategy(BaseStrategy):
     """行业轮动策略。
@@ -52,10 +50,9 @@ class SectorRotationStrategy(BaseStrategy):
 
         # 获取行业分类
         try:
-            with sqlite3.connect(self.engine.db_path) as conn:
-                rows = conn.execute(
-                    "SELECT symbol, industry FROM stock_basic WHERE industry IS NOT NULL"
-                ).fetchall()
+            rows = self.engine.fetch_all(
+                "SELECT ts_code, industry FROM ts_stock_basic WHERE industry IS NOT NULL"
+            )
         except Exception as exc:
             logger.warning(f"读取行业数据失败: {exc}")
             return []

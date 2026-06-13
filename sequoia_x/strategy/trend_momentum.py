@@ -1,14 +1,11 @@
 """趋势动量策略：MA5>MA20>MA60 多头排列 + RSI 50-80 + 近N日涨幅适中。"""
 
-import sqlite3
-
 import pandas as pd
 
 from sequoia_x.core.logger import get_logger
 from sequoia_x.strategy.base import BaseStrategy
 
 logger = get_logger(__name__)
-
 
 class TrendMomentumStrategy(BaseStrategy):
     """趋势动量策略。
