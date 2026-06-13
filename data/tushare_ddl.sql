@@ -11,12 +11,10 @@ USE tushare;
 DROP TABLE IF EXISTS `ts_adj_factor`;
 CREATE TABLE `ts_adj_factor` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `adj_factor` DECIMAL(20,4) DEFAULT NULL COMMENT 'adj_factor',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='本接口由Tushare自行生产，获取股票复权因子，可提取单只股票全部历史复权因子，也可以提取单日全部股票的复权因子。';
 
@@ -24,7 +22,6 @@ CREATE TABLE `ts_adj_factor` (
 DROP TABLE IF EXISTS `ts_bak_basic`;
 CREATE TABLE `ts_bak_basic` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -50,7 +47,6 @@ CREATE TABLE `ts_bak_basic` (
   `npr` DECIMAL(20,4) DEFAULT NULL COMMENT 'npr',
   `holder_num` INT DEFAULT NULL COMMENT 'holder_num',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取备用基础列表，数据从2016年开始';
 
@@ -58,7 +54,6 @@ CREATE TABLE `ts_bak_basic` (
 DROP TABLE IF EXISTS `ts_bak_daily`;
 CREATE TABLE `ts_bak_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -91,7 +86,6 @@ CREATE TABLE `ts_bak_daily` (
   `interval_3` DECIMAL(20,4) DEFAULT NULL COMMENT 'interval_3',
   `interval_6` DECIMAL(20,4) DEFAULT NULL COMMENT 'interval_6',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取备用行情，包括特定的行情指标(数据从2017年中左右开始，早期有几天数据缺失，近期正常)';
 
@@ -99,7 +93,6 @@ CREATE TABLE `ts_bak_daily` (
 DROP TABLE IF EXISTS `ts_balancesheet`;
 CREATE TABLE `ts_balancesheet` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `f_ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'f_ann_date',
@@ -253,14 +246,12 @@ CREATE TABLE `ts_balancesheet` (
   `oth_debt_invest` DECIMAL(20,4) DEFAULT NULL COMMENT 'oth_debt_invest',
   `update_flag` VARCHAR(64) DEFAULT NULL COMMENT 'update_flag',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司资产负债表';
 
 -- 大宗交易
 DROP TABLE IF EXISTS `ts_block_trade`;
 CREATE TABLE `ts_block_trade` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `price` DECIMAL(20,4) DEFAULT NULL COMMENT 'price',
@@ -269,7 +260,6 @@ CREATE TABLE `ts_block_trade` (
   `buyer` VARCHAR(64) DEFAULT NULL COMMENT 'buyer',
   `seller` VARCHAR(64) DEFAULT NULL COMMENT 'seller',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='大宗交易';
 
@@ -277,33 +267,28 @@ CREATE TABLE `ts_block_trade` (
 DROP TABLE IF EXISTS `ts_broker_recommend`;
 CREATE TABLE `ts_broker_recommend` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `month` DECIMAL(20,4) DEFAULT NULL COMMENT 'month',
   `broker` VARCHAR(64) DEFAULT NULL COMMENT 'broker',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取券商月度金股，一般1日~3日内更新当月数据';
 
 -- 获取北交所股票代码变更后新旧代码映射表数据
 DROP TABLE IF EXISTS `ts_bse_mapping`;
 CREATE TABLE `ts_bse_mapping` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `o_code` VARCHAR(64) NOT NULL COMMENT 'o_code',
   `n_code` VARCHAR(64) NOT NULL COMMENT 'n_code',
   `list_date` VARCHAR(64) DEFAULT NULL COMMENT 'list_date',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取北交所股票代码变更后新旧代码映射表数据';
 
 -- 获取上市公司现金流量表
 DROP TABLE IF EXISTS `ts_cashflow`;
 CREATE TABLE `ts_cashflow` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `f_ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'f_ann_date',
@@ -402,14 +387,12 @@ CREATE TABLE `ts_cashflow` (
   `beg_bal_cash_equ` DECIMAL(20,4) DEFAULT NULL COMMENT 'beg_bal_cash_equ',
   `update_flag` VARCHAR(64) DEFAULT NULL COMMENT 'update_flag',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司现金流量表';
 
 -- 获取中央结算系统持股汇总数据，覆盖全部历史数据，根据交易所披露时间，当日数据在下一交易日早上9点前完成入库
 DROP TABLE IF EXISTS `ts_ccass_hold`;
 CREATE TABLE `ts_ccass_hold` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -417,7 +400,6 @@ CREATE TABLE `ts_ccass_hold` (
   `hold_nums` VARCHAR(64) DEFAULT NULL COMMENT 'hold_nums',
   `hold_ratio` VARCHAR(64) DEFAULT NULL COMMENT 'hold_ratio',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取中央结算系统持股汇总数据，覆盖全部历史数据，根据交易所披露时间，当日数据在下一交易日早上9点前完成入库';
 
@@ -425,7 +407,6 @@ CREATE TABLE `ts_ccass_hold` (
 DROP TABLE IF EXISTS `ts_ccass_hold_detail`;
 CREATE TABLE `ts_ccass_hold_detail` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -434,7 +415,6 @@ CREATE TABLE `ts_ccass_hold_detail` (
   `col_shareholding` DECIMAL(20,4) DEFAULT NULL COMMENT 'col_shareholding',
   `col_shareholding_percent` DECIMAL(20,4) DEFAULT NULL COMMENT 'col_shareholding_percent',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取中央结算系统机构席位持股明细，数据覆盖';
 
@@ -442,13 +422,11 @@ CREATE TABLE `ts_ccass_hold_detail` (
 DROP TABLE IF EXISTS `ts_cyq_chips`;
 CREATE TABLE `ts_cyq_chips` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `price` DECIMAL(20,4) DEFAULT NULL COMMENT 'price',
   `percent` DECIMAL(20,4) DEFAULT NULL COMMENT 'percent',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股每日的筹码分布情况，提供各价位占比，数据从2018年开始，每天18~19点之间更新当日数据';
 
@@ -456,7 +434,6 @@ CREATE TABLE `ts_cyq_chips` (
 DROP TABLE IF EXISTS `ts_cyq_perf`;
 CREATE TABLE `ts_cyq_perf` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `his_low` DECIMAL(20,4) DEFAULT NULL COMMENT 'his_low',
@@ -469,7 +446,6 @@ CREATE TABLE `ts_cyq_perf` (
   `weight_avg` DECIMAL(20,4) DEFAULT NULL COMMENT 'weight_avg',
   `winner_rate` DECIMAL(20,4) DEFAULT NULL COMMENT 'winner_rate',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股每日筹码平均成本和胜率情况，每天18~19点左右更新，数据从2018年开始';
 
@@ -477,7 +453,6 @@ CREATE TABLE `ts_cyq_perf` (
 DROP TABLE IF EXISTS `ts_daily`;
 CREATE TABLE `ts_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `open` DECIMAL(20,4) DEFAULT NULL COMMENT 'open',
@@ -490,7 +465,6 @@ CREATE TABLE `ts_daily` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票行情数据，或通过通用行情接口获取数据，包含了前后复权数据';
 
@@ -498,7 +472,6 @@ CREATE TABLE `ts_daily` (
 DROP TABLE IF EXISTS `ts_daily_basic`;
 CREATE TABLE `ts_daily_basic` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -518,7 +491,6 @@ CREATE TABLE `ts_daily_basic` (
   `total_mv` DECIMAL(20,4) DEFAULT NULL COMMENT 'total_mv',
   `circ_mv` DECIMAL(20,4) DEFAULT NULL COMMENT 'circ_mv',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取全部股票每日重要的基本面指标，可用于选股分析、报表展示等。单次请求最大返回6000条数据，可按日线循环提取全部历史。';
 
@@ -526,7 +498,6 @@ CREATE TABLE `ts_daily_basic` (
 DROP TABLE IF EXISTS `ts_dc_concept`;
 CREATE TABLE `ts_dc_concept` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `theme_code` VARCHAR(64) NOT NULL COMMENT 'theme_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -540,7 +511,6 @@ CREATE TABLE `ts_dc_concept` (
   `lead_stock_code` VARCHAR(64) DEFAULT NULL COMMENT 'lead_stock_code',
   `lead_stock_pct_change` VARCHAR(64) DEFAULT NULL COMMENT 'lead_stock_pct_change',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取概念题材列表，每天盘后更新';
 
@@ -548,7 +518,6 @@ CREATE TABLE `ts_dc_concept` (
 DROP TABLE IF EXISTS `ts_dc_concept_cons`;
 CREATE TABLE `ts_dc_concept_cons` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -558,7 +527,6 @@ CREATE TABLE `ts_dc_concept_cons` (
   `reason` VARCHAR(64) DEFAULT NULL COMMENT 'reason',
   `hot_num` VARCHAR(64) DEFAULT NULL COMMENT 'hot_num',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取概念题材的成分股，每天盘后更新';
 
@@ -566,7 +534,6 @@ CREATE TABLE `ts_dc_concept_cons` (
 DROP TABLE IF EXISTS `ts_dc_daily`;
 CREATE TABLE `ts_dc_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -581,7 +548,6 @@ CREATE TABLE `ts_dc_daily` (
   `turnover_rate` VARCHAR(64) DEFAULT NULL COMMENT 'turnover_rate',
   `category` VARCHAR(64) DEFAULT NULL COMMENT 'category',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取概念板块、行业指数板块、地域板块行情数据，历史数据开始于2020年';
 
@@ -589,7 +555,6 @@ CREATE TABLE `ts_dc_daily` (
 DROP TABLE IF EXISTS `ts_dc_hot`;
 CREATE TABLE `ts_dc_hot` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `data_type` VARCHAR(64) DEFAULT NULL COMMENT 'data_type',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
@@ -601,7 +566,6 @@ CREATE TABLE `ts_dc_hot` (
   `concept` VARCHAR(64) DEFAULT NULL COMMENT 'concept',
   `rank_time` VARCHAR(64) DEFAULT NULL COMMENT 'rank_time',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取热榜数据，包括A股市场、ETF基金、港股市场、美股市场等等，每日盘中提取4次，收盘后4次，最晚22点提取一次。';
 
@@ -609,7 +573,6 @@ CREATE TABLE `ts_dc_hot` (
 DROP TABLE IF EXISTS `ts_dc_index`;
 CREATE TABLE `ts_dc_index` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -624,7 +587,6 @@ CREATE TABLE `ts_dc_index` (
   `idx_type` VARCHAR(64) DEFAULT NULL COMMENT 'idx_type',
   `level` DECIMAL(20,4) DEFAULT NULL COMMENT 'level',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取每个交易日的概念板块数据，支持按日期查询';
 
@@ -632,13 +594,11 @@ CREATE TABLE `ts_dc_index` (
 DROP TABLE IF EXISTS `ts_dc_member`;
 CREATE TABLE `ts_dc_member` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `con_code` VARCHAR(64) NOT NULL COMMENT 'con_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取板块每日成分数据，可以根据概念板块代码和交易日期，获取历史成分';
 
@@ -646,21 +606,18 @@ CREATE TABLE `ts_dc_member` (
 DROP TABLE IF EXISTS `ts_disclosure_date`;
 CREATE TABLE `ts_disclosure_date` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `pre_date` VARCHAR(64) DEFAULT NULL COMMENT 'pre_date',
   `actual_date` VARCHAR(64) DEFAULT NULL COMMENT 'actual_date',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取财报披露计划日期';
 
 -- 分红送股数据
 DROP TABLE IF EXISTS `ts_dividend`;
 CREATE TABLE `ts_dividend` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
@@ -676,14 +633,12 @@ CREATE TABLE `ts_dividend` (
   `div_listdate` VARCHAR(64) DEFAULT NULL COMMENT 'div_listdate',
   `imp_ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'imp_ann_date',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分红送股数据';
 
 -- 获取上市公司业绩快报
 DROP TABLE IF EXISTS `ts_express`;
 CREATE TABLE `ts_express` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -700,14 +655,12 @@ CREATE TABLE `ts_express` (
   `perf_summary` VARCHAR(64) DEFAULT NULL COMMENT 'perf_summary',
   `update_flag` VARCHAR(64) DEFAULT NULL COMMENT 'update_flag',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司业绩快报';
 
 -- 获取上市公司定期财务审计意见数据
 DROP TABLE IF EXISTS `ts_fina_audit`;
 CREATE TABLE `ts_fina_audit` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -716,14 +669,12 @@ CREATE TABLE `ts_fina_audit` (
   `audit_agency` VARCHAR(64) DEFAULT NULL COMMENT 'audit_agency',
   `audit_sign` VARCHAR(64) DEFAULT NULL COMMENT 'audit_sign',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司定期财务审计意见数据';
 
 -- 获取上市公司财务指标数据，为避免服务器压力，现阶段每次请求最多返回100条记录，可通过设置日期多次请求获取更多数据。
 DROP TABLE IF EXISTS `ts_fina_indicator`;
 CREATE TABLE `ts_fina_indicator` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -833,14 +784,12 @@ CREATE TABLE `ts_fina_indicator` (
   `q_op_qoq` DECIMAL(20,4) DEFAULT NULL COMMENT 'q_op_qoq',
   `equity_yoy` DECIMAL(20,4) DEFAULT NULL COMMENT 'equity_yoy',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司财务指标数据，为避免服务器压力，现阶段每次请求最多返回100条记录，可通过设置日期多次请求获取更多数据。';
 
 -- 获得上市公司主营业务构成，分地区和产品两种方式
 DROP TABLE IF EXISTS `ts_fina_mainbz`;
 CREATE TABLE `ts_fina_mainbz` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `bz_item` DECIMAL(20,4) DEFAULT NULL COMMENT 'bz_item',
@@ -850,14 +799,12 @@ CREATE TABLE `ts_fina_mainbz` (
   `bz_cost` DECIMAL(20,4) DEFAULT NULL COMMENT 'bz_cost',
   `curr_type` VARCHAR(64) DEFAULT NULL COMMENT 'curr_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获得上市公司主营业务构成，分地区和产品两种方式';
 
 -- 获取业绩预告数据
 DROP TABLE IF EXISTS `ts_forecast`;
 CREATE TABLE `ts_forecast` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -872,21 +819,18 @@ CREATE TABLE `ts_forecast` (
   `change_reason` VARCHAR(64) DEFAULT NULL COMMENT 'change_reason',
   `update_flag` VARCHAR(64) DEFAULT NULL COMMENT 'update_flag',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取业绩预告数据';
 
 -- 获取港股通每日成交信息，数据从2014年开始
 DROP TABLE IF EXISTS `ts_ggt_daily`;
 CREATE TABLE `ts_ggt_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `buy_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_amount',
   `buy_volume` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_volume',
   `sell_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'sell_amount',
   `sell_volume` DECIMAL(20,4) DEFAULT NULL COMMENT 'sell_volume',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取港股通每日成交信息，数据从2014年开始';
 
@@ -894,7 +838,6 @@ CREATE TABLE `ts_ggt_daily` (
 DROP TABLE IF EXISTS `ts_ggt_top10`;
 CREATE TABLE `ts_ggt_top10` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -913,7 +856,6 @@ CREATE TABLE `ts_ggt_top10` (
   `sz_buy` DECIMAL(20,4) DEFAULT NULL COMMENT 'sz_buy',
   `sz_sell` DECIMAL(20,4) DEFAULT NULL COMMENT 'sz_sell',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取港股通每日成交数据，其中包括沪市、深市详细数据，每天18~20点之间完成当日更新';
 
@@ -921,7 +863,6 @@ CREATE TABLE `ts_ggt_top10` (
 DROP TABLE IF EXISTS `ts_hk_hold`;
 CREATE TABLE `ts_hk_hold` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `code` VARCHAR(64) NOT NULL COMMENT 'code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
@@ -930,7 +871,6 @@ CREATE TABLE `ts_hk_hold` (
   `ratio` DECIMAL(20,4) DEFAULT NULL COMMENT 'ratio',
   `exchange` VARCHAR(64) DEFAULT NULL COMMENT 'exchange',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪深港股通持股明细，数据来源港交所。';
 
@@ -938,7 +878,6 @@ CREATE TABLE `ts_hk_hold` (
 DROP TABLE IF EXISTS `ts_hm_detail`;
 CREATE TABLE `ts_hm_detail` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ts_name` DECIMAL(20,4) DEFAULT NULL COMMENT 'ts_name',
@@ -948,7 +887,6 @@ CREATE TABLE `ts_hm_detail` (
   `hm_name` VARCHAR(64) DEFAULT NULL COMMENT 'hm_name',
   `hm_orgs` VARCHAR(64) DEFAULT NULL COMMENT 'hm_orgs',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取每日游资交易明细，数据开始于2022年8。游资分类名录，请点击';
 
@@ -956,19 +894,16 @@ CREATE TABLE `ts_hm_detail` (
 DROP TABLE IF EXISTS `ts_hm_list`;
 CREATE TABLE `ts_hm_list` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `desc` VARCHAR(64) DEFAULT NULL COMMENT 'desc',
   `orgs` DECIMAL(20,4) DEFAULT NULL COMMENT 'orgs',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取游资分类名录信息';
 
 -- 获取沪股通、深股通每日前十大成交详细数据，每天18~20点之间完成当日更新
 DROP TABLE IF EXISTS `ts_hsgt_top10`;
 CREATE TABLE `ts_hsgt_top10` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -981,7 +916,6 @@ CREATE TABLE `ts_hsgt_top10` (
   `buy` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy',
   `sell` DECIMAL(20,4) DEFAULT NULL COMMENT 'sell',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪股通、深股通每日前十大成交详细数据，每天18~20点之间完成当日更新';
 
@@ -989,7 +923,6 @@ CREATE TABLE `ts_hsgt_top10` (
 DROP TABLE IF EXISTS `ts_income`;
 CREATE TABLE `ts_income` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `f_ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'f_ann_date',
@@ -1076,14 +1009,12 @@ CREATE TABLE `ts_income` (
   `continued_net_profit` DECIMAL(20,4) DEFAULT NULL COMMENT 'continued_net_profit',
   `update_flag` VARCHAR(64) DEFAULT NULL COMMENT 'update_flag',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司财务利润表数据';
 
 -- 获取概念题材的成分股
 DROP TABLE IF EXISTS `ts_kpl_concept_cons`;
 CREATE TABLE `ts_kpl_concept_cons` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `con_name` VARCHAR(64) DEFAULT NULL COMMENT 'con_name',
@@ -1092,7 +1023,6 @@ CREATE TABLE `ts_kpl_concept_cons` (
   `desc` VARCHAR(64) DEFAULT NULL COMMENT 'desc',
   `hot_num` VARCHAR(64) DEFAULT NULL COMMENT 'hot_num',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取概念题材的成分股';
 
@@ -1100,7 +1030,6 @@ CREATE TABLE `ts_kpl_concept_cons` (
 DROP TABLE IF EXISTS `ts_kpl_list`;
 CREATE TABLE `ts_kpl_list` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
@@ -1126,7 +1055,6 @@ CREATE TABLE `ts_kpl_list` (
   `free_float` VARCHAR(64) DEFAULT NULL COMMENT 'free_float',
   `lu_limit_order` VARCHAR(64) DEFAULT NULL COMMENT 'lu_limit_order',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取涨停、跌停、炸板等榜单数据';
 
@@ -1134,7 +1062,6 @@ CREATE TABLE `ts_kpl_list` (
 DROP TABLE IF EXISTS `ts_limit_cpt_list`;
 CREATE TABLE `ts_limit_cpt_list` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
@@ -1145,7 +1072,6 @@ CREATE TABLE `ts_limit_cpt_list` (
   `pct_chg` VARCHAR(64) DEFAULT NULL COMMENT 'pct_chg',
   `rank` INT DEFAULT NULL COMMENT 'rank',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取每天涨停股票最多最强的概念板块，可以分析强势板块的轮动，判断资金动向';
 
@@ -1153,7 +1079,6 @@ CREATE TABLE `ts_limit_cpt_list` (
 DROP TABLE IF EXISTS `ts_limit_list_d`;
 CREATE TABLE `ts_limit_list_d` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `industry` VARCHAR(64) DEFAULT NULL COMMENT 'industry',
@@ -1173,7 +1098,6 @@ CREATE TABLE `ts_limit_list_d` (
   `limit_times` INT DEFAULT NULL COMMENT 'limit_times',
   `limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'limit',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股每日涨跌停、炸板数据情况，数据从2020年开始（不提供ST股票的统计）';
 
@@ -1181,7 +1105,6 @@ CREATE TABLE `ts_limit_list_d` (
 DROP TABLE IF EXISTS `ts_limit_list_ths`;
 CREATE TABLE `ts_limit_list_ths` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -1201,7 +1124,6 @@ CREATE TABLE `ts_limit_list_ths` (
   `turnover` DECIMAL(20,4) DEFAULT NULL COMMENT 'turnover',
   `market_type` VARCHAR(64) DEFAULT NULL COMMENT 'market_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取同花顺每日涨跌停榜单数据，历史数据从20231101开始提供，增量每天16点左右更新';
 
@@ -1209,13 +1131,11 @@ CREATE TABLE `ts_limit_list_ths` (
 DROP TABLE IF EXISTS `ts_limit_step`;
 CREATE TABLE `ts_limit_step` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `nums` VARCHAR(64) DEFAULT NULL COMMENT 'nums',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取每天连板个数晋级的股票';
 
@@ -1223,7 +1143,6 @@ CREATE TABLE `ts_limit_step` (
 DROP TABLE IF EXISTS `ts_margin`;
 CREATE TABLE `ts_margin` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `exchange_id` VARCHAR(64) DEFAULT NULL COMMENT 'exchange_id',
   `rzye` DECIMAL(20,4) DEFAULT NULL COMMENT 'rzye',
@@ -1234,7 +1153,6 @@ CREATE TABLE `ts_margin` (
   `rzrqye` DECIMAL(20,4) DEFAULT NULL COMMENT 'rzrqye',
   `rqyl` DECIMAL(20,4) DEFAULT NULL COMMENT 'rqyl',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取融资融券每日交易汇总数据，交易所于每天8点30左右更新上一日数据';
 
@@ -1242,7 +1160,6 @@ CREATE TABLE `ts_margin` (
 DROP TABLE IF EXISTS `ts_margin_detail`;
 CREATE TABLE `ts_margin_detail` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `rzye` DECIMAL(20,4) DEFAULT NULL COMMENT 'rzye',
@@ -1254,7 +1171,6 @@ CREATE TABLE `ts_margin_detail` (
   `rqmcl` DECIMAL(20,4) DEFAULT NULL COMMENT 'rqmcl',
   `rzrqye` DECIMAL(20,4) DEFAULT NULL COMMENT 'rzrqye',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪深两市每日融资融券明细，，交易所于每天8点30左右更新上一日数据';
 
@@ -1262,13 +1178,11 @@ CREATE TABLE `ts_margin_detail` (
 DROP TABLE IF EXISTS `ts_margin_secs`;
 CREATE TABLE `ts_margin_secs` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `exchange` VARCHAR(64) DEFAULT NULL COMMENT 'exchange',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪深京三大交易所融资融券标的（包括ETF），每天盘前更新';
 
@@ -1276,7 +1190,6 @@ CREATE TABLE `ts_margin_secs` (
 DROP TABLE IF EXISTS `ts_moneyflow`;
 CREATE TABLE `ts_moneyflow` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `buy_sm_vol` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_vol',
@@ -1298,7 +1211,6 @@ CREATE TABLE `ts_moneyflow` (
   `net_mf_vol` DECIMAL(20,4) DEFAULT NULL COMMENT 'net_mf_vol',
   `net_mf_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'net_mf_amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪深A股票资金流向数据，分析大单小单成交情况，用于判别资金动向，数据开始于2010年。';
 
@@ -1306,7 +1218,6 @@ CREATE TABLE `ts_moneyflow` (
 DROP TABLE IF EXISTS `ts_moneyflow_cnt_ths`;
 CREATE TABLE `ts_moneyflow_cnt_ths` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -1320,7 +1231,6 @@ CREATE TABLE `ts_moneyflow_cnt_ths` (
   `net_sell_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'net_sell_amount',
   `net_amount` VARCHAR(64) DEFAULT NULL COMMENT 'net_amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取同花顺概念板块每日资金流向';
 
@@ -1328,7 +1238,6 @@ CREATE TABLE `ts_moneyflow_cnt_ths` (
 DROP TABLE IF EXISTS `ts_moneyflow_dc`;
 CREATE TABLE `ts_moneyflow_dc` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -1345,7 +1254,6 @@ CREATE TABLE `ts_moneyflow_dc` (
   `buy_sm_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount',
   `buy_sm_amount_rate` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount_rate',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取东方财富个股资金流向数据，每日盘后更新，数据开始于20230911';
 
@@ -1353,7 +1261,6 @@ CREATE TABLE `ts_moneyflow_dc` (
 DROP TABLE IF EXISTS `ts_moneyflow_hsgt`;
 CREATE TABLE `ts_moneyflow_hsgt` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ggt_ss` DECIMAL(20,4) DEFAULT NULL COMMENT 'ggt_ss',
   `ggt_sz` DECIMAL(20,4) DEFAULT NULL COMMENT 'ggt_sz',
@@ -1362,7 +1269,6 @@ CREATE TABLE `ts_moneyflow_hsgt` (
   `north_money` DECIMAL(20,4) DEFAULT NULL COMMENT 'north_money',
   `south_money` DECIMAL(20,4) DEFAULT NULL COMMENT 'south_money',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪股通、深股通、港股通每日资金流向数据，每次最多返回300条记录，总量不限制。';
 
@@ -1370,7 +1276,6 @@ CREATE TABLE `ts_moneyflow_hsgt` (
 DROP TABLE IF EXISTS `ts_moneyflow_ind_dc`;
 CREATE TABLE `ts_moneyflow_ind_dc` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `content_type` VARCHAR(64) DEFAULT NULL COMMENT 'content_type',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
@@ -1390,7 +1295,6 @@ CREATE TABLE `ts_moneyflow_ind_dc` (
   `buy_sm_amount_stock` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount_stock',
   `rank` INT DEFAULT NULL COMMENT 'rank',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取东方财富板块资金流向，每天盘后更新';
 
@@ -1398,7 +1302,6 @@ CREATE TABLE `ts_moneyflow_ind_dc` (
 DROP TABLE IF EXISTS `ts_moneyflow_ind_ths`;
 CREATE TABLE `ts_moneyflow_ind_ths` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `industry` VARCHAR(64) DEFAULT NULL COMMENT 'industry',
@@ -1412,7 +1315,6 @@ CREATE TABLE `ts_moneyflow_ind_ths` (
   `net_sell_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'net_sell_amount',
   `net_amount` VARCHAR(64) DEFAULT NULL COMMENT 'net_amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取同花顺行业资金流向，每日盘后更新';
 
@@ -1420,7 +1322,6 @@ CREATE TABLE `ts_moneyflow_ind_ths` (
 DROP TABLE IF EXISTS `ts_moneyflow_mkt_dc`;
 CREATE TABLE `ts_moneyflow_mkt_dc` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close_sh` DECIMAL(20,4) DEFAULT NULL COMMENT 'close_sh',
   `pct_change_sh` DECIMAL(20,4) DEFAULT NULL COMMENT 'pct_change_sh',
@@ -1437,7 +1338,6 @@ CREATE TABLE `ts_moneyflow_mkt_dc` (
   `buy_sm_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount',
   `buy_sm_amount_rate` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount_rate',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取东方财富大盘资金流向数据，每日盘后更新';
 
@@ -1445,7 +1345,6 @@ CREATE TABLE `ts_moneyflow_mkt_dc` (
 DROP TABLE IF EXISTS `ts_moneyflow_ths`;
 CREATE TABLE `ts_moneyflow_ths` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -1460,7 +1359,6 @@ CREATE TABLE `ts_moneyflow_ths` (
   `buy_sm_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount',
   `buy_sm_amount_rate` DECIMAL(20,4) DEFAULT NULL COMMENT 'buy_sm_amount_rate',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取同花顺个股资金流向数据，每日盘后更新';
 
@@ -1468,7 +1366,6 @@ CREATE TABLE `ts_moneyflow_ths` (
 DROP TABLE IF EXISTS `ts_monthly`;
 CREATE TABLE `ts_monthly` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -1480,7 +1377,6 @@ CREATE TABLE `ts_monthly` (
   `pct_chg` VARCHAR(64) DEFAULT NULL COMMENT 'pct_chg',
   `Y` DECIMAL(20,4) DEFAULT NULL COMMENT 'Y',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股月线数据';
 
@@ -1488,7 +1384,6 @@ CREATE TABLE `ts_monthly` (
 DROP TABLE IF EXISTS `ts_namechange`;
 CREATE TABLE `ts_namechange` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `start_date` VARCHAR(64) DEFAULT NULL COMMENT 'start_date',
@@ -1496,14 +1391,12 @@ CREATE TABLE `ts_namechange` (
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `change_reason` VARCHAR(64) DEFAULT NULL COMMENT 'change_reason',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='历史名称变更记录';
 
 -- 获取新股上市列表数据
 DROP TABLE IF EXISTS `ts_new_share`;
 CREATE TABLE `ts_new_share` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `sub_code` VARCHAR(64) DEFAULT NULL COMMENT 'sub_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -1517,14 +1410,12 @@ CREATE TABLE `ts_new_share` (
   `funds` DECIMAL(20,4) DEFAULT NULL COMMENT 'funds',
   `ballot` DECIMAL(20,4) DEFAULT NULL COMMENT 'ballot',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取新股上市列表数据';
 
 -- 获取股票质押明细数据
 DROP TABLE IF EXISTS `ts_pledge_detail`;
 CREATE TABLE `ts_pledge_detail` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `holder_name` VARCHAR(64) DEFAULT NULL COMMENT 'holder_name',
@@ -1540,14 +1431,12 @@ CREATE TABLE `ts_pledge_detail` (
   `h_total_ratio` DECIMAL(20,4) DEFAULT NULL COMMENT 'h_total_ratio',
   `is_buyback` VARCHAR(64) DEFAULT NULL COMMENT 'is_buyback',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票质押明细数据';
 
 -- 获取股票质押统计数据
 DROP TABLE IF EXISTS `ts_pledge_stat`;
 CREATE TABLE `ts_pledge_stat` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `pledge_count` INT DEFAULT NULL COMMENT 'pledge_count',
@@ -1556,14 +1445,12 @@ CREATE TABLE `ts_pledge_stat` (
   `total_share` DECIMAL(20,4) DEFAULT NULL COMMENT 'total_share',
   `pledge_ratio` DECIMAL(20,4) DEFAULT NULL COMMENT 'pledge_ratio',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票质押统计数据';
 
 -- 获取券商（卖方）每天研报的盈利预测数据，数据从2010年开始，每晚19~22点更新当日数据
 DROP TABLE IF EXISTS `ts_report_rc`;
 CREATE TABLE `ts_report_rc` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `report_date` VARCHAR(64) DEFAULT NULL COMMENT 'report_date',
@@ -1586,14 +1473,12 @@ CREATE TABLE `ts_report_rc` (
   `max_price` DECIMAL(20,4) DEFAULT NULL COMMENT 'max_price',
   `min_price` DECIMAL(20,4) DEFAULT NULL COMMENT 'min_price',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取券商（卖方）每天研报的盈利预测数据，数据从2010年开始，每晚19~22点更新当日数据';
 
 -- 获取上市公司回购股票数据
 DROP TABLE IF EXISTS `ts_repurchase`;
 CREATE TABLE `ts_repurchase` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -1604,14 +1489,12 @@ CREATE TABLE `ts_repurchase` (
   `high_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'high_limit',
   `low_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'low_limit',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司回购股票数据';
 
 -- 获取实时日k线行情，支持按股票代码及股票代码通配符一次性提取全部股票实时日k线行情
 DROP TABLE IF EXISTS `ts_rt_k`;
 CREATE TABLE `ts_rt_k` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `pre_close` DECIMAL(20,4) DEFAULT NULL COMMENT 'pre_close',
@@ -1628,14 +1511,12 @@ CREATE TABLE `ts_rt_k` (
   `bid_volume1` DECIMAL(20,4) DEFAULT NULL COMMENT 'bid_volume1',
   `trade_time` DECIMAL(20,4) DEFAULT NULL COMMENT 'trade_time',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取实时日k线行情，支持按股票代码及股票代码通配符一次性提取全部股票实时日k线行情';
 
 -- 获取全A股票实时分钟数据，包括1~60min
 DROP TABLE IF EXISTS `ts_rt_min`;
 CREATE TABLE `ts_rt_min` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `code` VARCHAR(64) NOT NULL COMMENT 'code',
   `time` VARCHAR(64) DEFAULT NULL COMMENT 'time',
   `open` DECIMAL(20,4) DEFAULT NULL COMMENT 'open',
@@ -1645,14 +1526,12 @@ CREATE TABLE `ts_rt_min` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取全A股票实时分钟数据，包括1~60min';
 
 -- 获取A股当日盘中历史分钟数据，可以提取单只股票当日开盘以来的所有分钟数据
 DROP TABLE IF EXISTS `ts_rt_min_daily`;
 CREATE TABLE `ts_rt_min_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `freq` VARCHAR(64) DEFAULT NULL COMMENT 'freq',
   `time` VARCHAR(64) DEFAULT NULL COMMENT 'time',
@@ -1663,14 +1542,12 @@ CREATE TABLE `ts_rt_min_daily` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股当日盘中历史分钟数据，可以提取单只股票当日开盘以来的所有分钟数据';
 
 -- 获取限售股解禁
 DROP TABLE IF EXISTS `ts_share_float`;
 CREATE TABLE `ts_share_float` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `float_date` VARCHAR(64) DEFAULT NULL COMMENT 'float_date',
@@ -1679,14 +1556,12 @@ CREATE TABLE `ts_share_float` (
   `holder_name` VARCHAR(64) DEFAULT NULL COMMENT 'holder_name',
   `share_type` VARCHAR(64) DEFAULT NULL COMMENT 'share_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取限售股解禁';
 
 -- 转融通融资汇总
 DROP TABLE IF EXISTS `ts_slb_len`;
 CREATE TABLE `ts_slb_len` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ob` DECIMAL(20,4) DEFAULT NULL COMMENT 'ob',
   `auc_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'auc_amount',
@@ -1694,7 +1569,6 @@ CREATE TABLE `ts_slb_len` (
   `repay_amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'repay_amount',
   `cb` DECIMAL(20,4) DEFAULT NULL COMMENT 'cb',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_trade_date` (`trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='转融通融资汇总';
 
@@ -1702,7 +1576,6 @@ CREATE TABLE `ts_slb_len` (
 DROP TABLE IF EXISTS `ts_st`;
 CREATE TABLE `ts_st` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `pub_date` VARCHAR(64) DEFAULT NULL COMMENT 'pub_date',
@@ -1711,28 +1584,24 @@ CREATE TABLE `ts_st` (
   `st_reason` VARCHAR(64) DEFAULT NULL COMMENT 'st_reason',
   `st_explain` VARCHAR(64) DEFAULT NULL COMMENT 'st_explain',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ST风险警示板股票列表';
 
 -- 获取股票账户开户数据，统计周期为一周
 DROP TABLE IF EXISTS `ts_stk_account`;
 CREATE TABLE `ts_stk_account` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `date` DECIMAL(20,4) DEFAULT NULL COMMENT 'date',
   `weekly_new` DECIMAL(20,4) DEFAULT NULL COMMENT 'weekly_new',
   `total` DECIMAL(20,4) DEFAULT NULL COMMENT 'total',
   `weekly_hold` DECIMAL(20,4) DEFAULT NULL COMMENT 'weekly_hold',
   `weekly_trade` DECIMAL(20,4) DEFAULT NULL COMMENT 'weekly_trade',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票账户开户数据，统计周期为一周';
 
 -- 获取股票账户开户数据旧版格式数据，数据从2008年1月开始，到2015年5月29，新数据请通过
 DROP TABLE IF EXISTS `ts_stk_account_old`;
 CREATE TABLE `ts_stk_account_old` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `date` DECIMAL(20,4) DEFAULT NULL COMMENT 'date',
   `new_sh` DECIMAL(20,4) DEFAULT NULL COMMENT 'new_sh',
   `new_sz` DECIMAL(20,4) DEFAULT NULL COMMENT 'new_sz',
@@ -1743,14 +1612,12 @@ CREATE TABLE `ts_stk_account_old` (
   `trade_sh` DECIMAL(20,4) DEFAULT NULL COMMENT 'trade_sh',
   `trade_sz` DECIMAL(20,4) DEFAULT NULL COMMENT 'trade_sz',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票账户开户数据旧版格式数据，数据从2008年1月开始，到2015年5月29，新数据请通过';
 
 -- AH股比价数据，可根据交易日期获取历史
 DROP TABLE IF EXISTS `ts_stk_ah_comparison`;
 CREATE TABLE `ts_stk_ah_comparison` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `hk_code` VARCHAR(64) DEFAULT NULL COMMENT 'hk_code',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
@@ -1763,7 +1630,6 @@ CREATE TABLE `ts_stk_ah_comparison` (
   `ah_comparison` DECIMAL(20,4) DEFAULT NULL COMMENT 'ah_comparison',
   `ah_premium` DECIMAL(20,4) DEFAULT NULL COMMENT 'ah_premium',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AH股比价数据，可根据交易日期获取历史';
 
@@ -1771,21 +1637,18 @@ CREATE TABLE `ts_stk_ah_comparison` (
 DROP TABLE IF EXISTS `ts_stk_alert`;
 CREATE TABLE `ts_stk_alert` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `start_date` VARCHAR(64) DEFAULT NULL COMMENT 'start_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `type` VARCHAR(64) DEFAULT NULL COMMENT 'type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='根据证券交易所交易规则的有关规定，交易所每日发布重点提示证券';
 
 -- 获取当日个股和ETF的集合竞价成交情况，每天9点26~29分之间可以获取当日的集合竞价成交数据
 DROP TABLE IF EXISTS `ts_stk_auction`;
 CREATE TABLE `ts_stk_auction` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `vol` INT DEFAULT NULL COMMENT 'vol',
@@ -1796,7 +1659,6 @@ CREATE TABLE `ts_stk_auction` (
   `volume_ratio` DECIMAL(20,4) DEFAULT NULL COMMENT 'volume_ratio',
   `float_share` DECIMAL(20,4) DEFAULT NULL COMMENT 'float_share',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取当日个股和ETF的集合竞价成交情况，每天9点26~29分之间可以获取当日的集合竞价成交数据';
 
@@ -1804,7 +1666,6 @@ CREATE TABLE `ts_stk_auction` (
 DROP TABLE IF EXISTS `ts_stk_auction_c`;
 CREATE TABLE `ts_stk_auction_c` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -1815,7 +1676,6 @@ CREATE TABLE `ts_stk_auction_c` (
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   `vwap` DECIMAL(20,4) DEFAULT NULL COMMENT 'vwap',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票收盘15:00集合竞价数据，每天盘后更新';
 
@@ -1823,7 +1683,6 @@ CREATE TABLE `ts_stk_auction_c` (
 DROP TABLE IF EXISTS `ts_stk_auction_o`;
 CREATE TABLE `ts_stk_auction_o` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -1834,7 +1693,6 @@ CREATE TABLE `ts_stk_auction_o` (
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   `vwap` DECIMAL(20,4) DEFAULT NULL COMMENT 'vwap',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票开盘9:30集合竞价数据，每天盘后更新';
 
@@ -1842,7 +1700,6 @@ CREATE TABLE `ts_stk_auction_o` (
 DROP TABLE IF EXISTS `ts_stk_factor`;
 CREATE TABLE `ts_stk_factor` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -1879,7 +1736,6 @@ CREATE TABLE `ts_stk_factor` (
   `boll_lower` DECIMAL(20,4) DEFAULT NULL COMMENT 'boll_lower',
   `cci` DECIMAL(20,4) DEFAULT NULL COMMENT 'cci',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票每日技术面因子数据，用于跟踪股票当前走势情况，数据由Tushare社区自产，覆盖全历史';
 
@@ -1887,7 +1743,6 @@ CREATE TABLE `ts_stk_factor` (
 DROP TABLE IF EXISTS `ts_stk_factor_pro`;
 CREATE TABLE `ts_stk_factor_pro` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `open` DECIMAL(20,4) DEFAULT NULL COMMENT 'open',
@@ -2150,7 +2005,6 @@ CREATE TABLE `ts_stk_factor_pro` (
   `xsii_td4_hfq` DECIMAL(20,4) DEFAULT NULL COMMENT 'xsii_td4_hfq',
   `xsii_td4_qfq` DECIMAL(20,4) DEFAULT NULL COMMENT 'xsii_td4_qfq',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取股票每日技术面因子数据，用于跟踪股票当前走势情况，数据由Tushare社区自产，覆盖全历史；输出参数_bfq表示不复权，_qfq表示前复权 _hfq表示后复';
 
@@ -2158,14 +2012,12 @@ CREATE TABLE `ts_stk_factor_pro` (
 DROP TABLE IF EXISTS `ts_stk_high_shock`;
 CREATE TABLE `ts_stk_high_shock` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `trade_market` DECIMAL(20,4) DEFAULT NULL COMMENT 'trade_market',
   `reason` VARCHAR(64) DEFAULT NULL COMMENT 'reason',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='根据证券交易所交易规则的有关规定，交易所每日发布股票交易严重异常波动情况';
 
@@ -2173,20 +2025,17 @@ CREATE TABLE `ts_stk_high_shock` (
 DROP TABLE IF EXISTS `ts_stk_holdernumber`;
 CREATE TABLE `ts_stk_holdernumber` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   `holder_num` INT DEFAULT NULL COMMENT 'holder_num',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司股东户数数据，数据不定期公布';
 
 -- 获取上市公司增减持数据，了解重要股东近期及历史上的股份增减变化
 DROP TABLE IF EXISTS `ts_stk_holdertrade`;
 CREATE TABLE `ts_stk_holdertrade` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `holder_name` VARCHAR(64) DEFAULT NULL COMMENT 'holder_name',
@@ -2199,20 +2048,17 @@ CREATE TABLE `ts_stk_holdertrade` (
   `avg_price` DECIMAL(20,4) DEFAULT NULL COMMENT 'avg_price',
   `total_share` DECIMAL(20,4) DEFAULT NULL COMMENT 'total_share',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司增减持数据，了解重要股东近期及历史上的股份增减变化';
 
 -- 获取全市场（包含A/B股和基金）每日涨跌停价格，包括涨停价格，跌停价格等，每个交易日8点40左右更新当日股票涨跌停价格。
 DROP TABLE IF EXISTS `ts_stk_limit`;
 CREATE TABLE `ts_stk_limit` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `up_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'up_limit',
   `down_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'down_limit',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取全市场（包含A/B股和基金）每日涨跌停价格，包括涨停价格，跌停价格等，每个交易日8点40左右更新当日股票涨跌停价格。';
 
@@ -2220,7 +2066,6 @@ CREATE TABLE `ts_stk_limit` (
 DROP TABLE IF EXISTS `ts_stk_managers`;
 CREATE TABLE `ts_stk_managers` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -2233,14 +2078,12 @@ CREATE TABLE `ts_stk_managers` (
   `begin_date` VARCHAR(64) DEFAULT NULL COMMENT 'begin_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司管理层';
 
 -- 获取A股分钟数据，支持1min/5min/15min/30min/60min行情
 DROP TABLE IF EXISTS `ts_stk_mins`;
 CREATE TABLE `ts_stk_mins` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_time` DECIMAL(20,4) DEFAULT NULL COMMENT 'trade_time',
   `open` DECIMAL(20,4) DEFAULT NULL COMMENT 'open',
@@ -2250,14 +2093,12 @@ CREATE TABLE `ts_stk_mins` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股分钟数据，支持1min/5min/15min/30min/60min行情';
 
 -- 神奇九转（又称“九转序列”）是一种基于技术分析的股票趋势反转指标，其思想来源于技术分析大师汤姆·迪马克（Tom DeMark）的TD序列。该指标的核心功能是通过
 DROP TABLE IF EXISTS `ts_stk_nineturn`;
 CREATE TABLE `ts_stk_nineturn` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `freq` VARCHAR(64) DEFAULT NULL COMMENT 'freq',
@@ -2272,7 +2113,6 @@ CREATE TABLE `ts_stk_nineturn` (
   `nine_up_turn` VARCHAR(64) DEFAULT NULL COMMENT 'nine_up_turn',
   `nine_down_turn` VARCHAR(64) DEFAULT NULL COMMENT 'nine_down_turn',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='神奇九转（又称“九转序列”）是一种基于技术分析的股票趋势反转指标，其思想来源于技术分析大师汤姆·迪马克（Tom DeMark）的TD序列。该指标的核心功能是通过';
 
@@ -2280,7 +2120,6 @@ CREATE TABLE `ts_stk_nineturn` (
 DROP TABLE IF EXISTS `ts_stk_premarket`;
 CREATE TABLE `ts_stk_premarket` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `total_share` DECIMAL(20,4) DEFAULT NULL COMMENT 'total_share',
@@ -2289,7 +2128,6 @@ CREATE TABLE `ts_stk_premarket` (
   `up_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'up_limit',
   `down_limit` DECIMAL(20,4) DEFAULT NULL COMMENT 'down_limit',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日开盘前获取当日股票的股本情况，包括总股本和流通股本，涨跌停价格等。';
 
@@ -2297,7 +2135,6 @@ CREATE TABLE `ts_stk_premarket` (
 DROP TABLE IF EXISTS `ts_stk_rewards`;
 CREATE TABLE `ts_stk_rewards` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -2306,14 +2143,12 @@ CREATE TABLE `ts_stk_rewards` (
   `reward` DECIMAL(20,4) DEFAULT NULL COMMENT 'reward',
   `hold_vol` DECIMAL(20,4) DEFAULT NULL COMMENT 'hold_vol',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司管理层薪酬和持股';
 
 -- 根据证券交易所交易规则的有关规定，交易所每日发布股票交易异常波动情况
 DROP TABLE IF EXISTS `ts_stk_shock`;
 CREATE TABLE `ts_stk_shock` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -2321,7 +2156,6 @@ CREATE TABLE `ts_stk_shock` (
   `reason` VARCHAR(64) DEFAULT NULL COMMENT 'reason',
   `period` VARCHAR(64) DEFAULT NULL COMMENT 'period',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='根据证券交易所交易规则的有关规定，交易所每日发布股票交易异常波动情况';
 
@@ -2329,7 +2163,6 @@ CREATE TABLE `ts_stk_shock` (
 DROP TABLE IF EXISTS `ts_stk_surv`;
 CREATE TABLE `ts_stk_surv` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `surv_date` VARCHAR(64) DEFAULT NULL COMMENT 'surv_date',
@@ -2340,14 +2173,12 @@ CREATE TABLE `ts_stk_surv` (
   `org_type` VARCHAR(64) DEFAULT NULL COMMENT 'org_type',
   `comp_rece` VARCHAR(64) DEFAULT NULL COMMENT 'comp_rece',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司机构调研记录数据';
 
 -- 周月线复权行情数据
 DROP TABLE IF EXISTS `ts_stk_week_month_adj`;
 CREATE TABLE `ts_stk_week_month_adj` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -2370,7 +2201,6 @@ CREATE TABLE `ts_stk_week_month_adj` (
   `change` DECIMAL(20,4) DEFAULT NULL COMMENT 'change',
   `pct_chg` VARCHAR(64) DEFAULT NULL COMMENT 'pct_chg',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='周月线复权行情数据';
 
@@ -2378,7 +2208,6 @@ CREATE TABLE `ts_stk_week_month_adj` (
 DROP TABLE IF EXISTS `ts_stk_weekly_monthly`;
 CREATE TABLE `ts_stk_weekly_monthly` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -2393,7 +2222,6 @@ CREATE TABLE `ts_stk_weekly_monthly` (
   `change` DECIMAL(20,4) DEFAULT NULL COMMENT 'change',
   `pct_chg` VARCHAR(64) DEFAULT NULL COMMENT 'pct_chg',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票周/月线行情(每日更新)';
 
@@ -2401,7 +2229,6 @@ CREATE TABLE `ts_stk_weekly_monthly` (
 DROP TABLE IF EXISTS `ts_stock_basic`;
 CREATE TABLE `ts_stock_basic` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `area` VARCHAR(64) DEFAULT NULL COMMENT 'area',
@@ -2412,14 +2239,12 @@ CREATE TABLE `ts_stock_basic` (
   `act_name` VARCHAR(64) DEFAULT NULL COMMENT 'act_name',
   `act_ent_type` VARCHAR(64) DEFAULT NULL COMMENT 'act_ent_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取基础信息数据，包括股票代码、名称、上市日期、退市日期等';
 
 -- 获取上市公司基础信息，单次提取4500条，可以根据交易所分批提取
 DROP TABLE IF EXISTS `ts_stock_company`;
 CREATE TABLE `ts_stock_company` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `com_name` DECIMAL(20,4) DEFAULT NULL COMMENT 'com_name',
   `com_id` VARCHAR(64) DEFAULT NULL COMMENT 'com_id',
@@ -2439,21 +2264,18 @@ CREATE TABLE `ts_stock_company` (
   `main_business` VARCHAR(64) DEFAULT NULL COMMENT 'main_business',
   `business_scope` VARCHAR(64) DEFAULT NULL COMMENT 'business_scope',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司基础信息，单次提取4500条，可以根据交易所分批提取';
 
 -- 获取沪深港通股票列表
 DROP TABLE IF EXISTS `ts_stock_hsgt`;
 CREATE TABLE `ts_stock_hsgt` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `type` VARCHAR(64) DEFAULT NULL COMMENT 'type',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `type_name` VARCHAR(64) DEFAULT NULL COMMENT 'type_name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取沪深港通股票列表';
 
@@ -2461,14 +2283,12 @@ CREATE TABLE `ts_stock_hsgt` (
 DROP TABLE IF EXISTS `ts_stock_st`;
 CREATE TABLE `ts_stock_st` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `type` VARCHAR(64) DEFAULT NULL COMMENT 'type',
   `type_name` VARCHAR(64) DEFAULT NULL COMMENT 'type_name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取ST股票列表，可根据交易日期获取历史上每天的ST列表权限：3000积分起提示：每天上午9:20更新，单次请求最大返回1000行数据，可循环提取,本接口数据从';
 
@@ -2476,13 +2296,11 @@ CREATE TABLE `ts_stock_st` (
 DROP TABLE IF EXISTS `ts_suspend_d`;
 CREATE TABLE `ts_suspend_d` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `suspend_timing` VARCHAR(64) DEFAULT NULL COMMENT 'suspend_timing',
   `suspend_type` VARCHAR(64) DEFAULT NULL COMMENT 'suspend_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='按日期方式获取股票每日停复牌信息';
 
@@ -2490,7 +2308,6 @@ CREATE TABLE `ts_suspend_d` (
 DROP TABLE IF EXISTS `ts_tdx_daily`;
 CREATE TABLE `ts_tdx_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -2530,7 +2347,6 @@ CREATE TABLE `ts_tdx_daily` (
   `bm_net` DECIMAL(20,4) DEFAULT NULL COMMENT 'bm_net',
   `bm_ratio` DECIMAL(20,4) DEFAULT NULL COMMENT 'bm_ratio',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取各板块行情，包括成交和估值等数据';
 
@@ -2538,7 +2354,6 @@ CREATE TABLE `ts_tdx_daily` (
 DROP TABLE IF EXISTS `ts_tdx_index`;
 CREATE TABLE `ts_tdx_index` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -2549,7 +2364,6 @@ CREATE TABLE `ts_tdx_index` (
   `total_mv` DECIMAL(20,4) DEFAULT NULL COMMENT 'total_mv',
   `float_mv` DECIMAL(20,4) DEFAULT NULL COMMENT 'float_mv',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取板块基础信息，包括概念板块、行业、风格、地域等';
 
@@ -2557,13 +2371,11 @@ CREATE TABLE `ts_tdx_index` (
 DROP TABLE IF EXISTS `ts_tdx_member`;
 CREATE TABLE `ts_tdx_member` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `con_code` VARCHAR(64) NOT NULL COMMENT 'con_code',
   `con_name` VARCHAR(64) DEFAULT NULL COMMENT 'con_name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取各板块成分股信息';
 
@@ -2571,7 +2383,6 @@ CREATE TABLE `ts_tdx_member` (
 DROP TABLE IF EXISTS `ts_ths_daily`;
 CREATE TABLE `ts_ths_daily` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `open` DECIMAL(20,4) DEFAULT NULL COMMENT 'open',
@@ -2585,7 +2396,6 @@ CREATE TABLE `ts_ths_daily` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `turnover_rate` VARCHAR(64) DEFAULT NULL COMMENT 'turnover_rate',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取板块指数行情';
 
@@ -2593,7 +2403,6 @@ CREATE TABLE `ts_ths_daily` (
 DROP TABLE IF EXISTS `ts_ths_hot`;
 CREATE TABLE `ts_ths_hot` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `data_type` VARCHAR(64) DEFAULT NULL COMMENT 'data_type',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
@@ -2606,7 +2415,6 @@ CREATE TABLE `ts_ths_hot` (
   `hot` VARCHAR(64) DEFAULT NULL COMMENT 'hot',
   `rank_time` VARCHAR(64) DEFAULT NULL COMMENT 'rank_time',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取热榜数据，包括热股、概念板块、ETF、可转债、港美股等等，每日盘中提取4次，收盘后4次，最晚22点提取一次。';
 
@@ -2614,7 +2422,6 @@ CREATE TABLE `ts_ths_hot` (
 DROP TABLE IF EXISTS `ts_ths_index`;
 CREATE TABLE `ts_ths_index` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
   `count` INT DEFAULT NULL COMMENT 'count',
@@ -2622,26 +2429,22 @@ CREATE TABLE `ts_ths_index` (
   `list_date` VARCHAR(64) DEFAULT NULL COMMENT 'list_date',
   `type` VARCHAR(64) DEFAULT NULL COMMENT 'type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取板块指数，包括概念、行业、特色指数';
 
 -- 获取概念板块成分列表
 DROP TABLE IF EXISTS `ts_ths_member`;
 CREATE TABLE `ts_ths_member` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `con_code` VARCHAR(64) NOT NULL COMMENT 'con_code',
   `con_name` VARCHAR(64) DEFAULT NULL COMMENT 'con_name',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取概念板块成分列表';
 
 -- 获取上市公司前十大流通股东数据
 DROP TABLE IF EXISTS `ts_top10_floatholders`;
 CREATE TABLE `ts_top10_floatholders` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -2652,14 +2455,12 @@ CREATE TABLE `ts_top10_floatholders` (
   `hold_change` DECIMAL(20,4) DEFAULT NULL COMMENT 'hold_change',
   `holder_type` VARCHAR(64) DEFAULT NULL COMMENT 'holder_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司前十大流通股东数据';
 
 -- 获取上市公司前十大股东数据，包括持有数量和比例等信息
 DROP TABLE IF EXISTS `ts_top10_holders`;
 CREATE TABLE `ts_top10_holders` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `ann_date` VARCHAR(64) DEFAULT NULL COMMENT 'ann_date',
   `end_date` VARCHAR(64) DEFAULT NULL COMMENT 'end_date',
@@ -2670,14 +2471,12 @@ CREATE TABLE `ts_top10_holders` (
   `hold_change` DECIMAL(20,4) DEFAULT NULL COMMENT 'hold_change',
   `holder_type` VARCHAR(64) DEFAULT NULL COMMENT 'holder_type',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取上市公司前十大股东数据，包括持有数量和比例等信息';
 
 -- 龙虎榜机构成交明细
 DROP TABLE IF EXISTS `ts_top_inst`;
 CREATE TABLE `ts_top_inst` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `exalter` DECIMAL(20,4) DEFAULT NULL COMMENT 'exalter',
@@ -2689,7 +2488,6 @@ CREATE TABLE `ts_top_inst` (
   `net_buy` DECIMAL(20,4) DEFAULT NULL COMMENT 'net_buy',
   `reason` VARCHAR(64) DEFAULT NULL COMMENT 'reason',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='龙虎榜机构成交明细';
 
@@ -2697,7 +2495,6 @@ CREATE TABLE `ts_top_inst` (
 DROP TABLE IF EXISTS `ts_top_list`;
 CREATE TABLE `ts_top_list` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `name` VARCHAR(64) DEFAULT NULL COMMENT 'name',
@@ -2714,7 +2511,6 @@ CREATE TABLE `ts_top_list` (
   `float_values` VARCHAR(64) DEFAULT NULL COMMENT 'float_values',
   `reason` VARCHAR(64) DEFAULT NULL COMMENT 'reason',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='龙虎榜每日交易明细';
 
@@ -2722,20 +2518,17 @@ CREATE TABLE `ts_top_list` (
 DROP TABLE IF EXISTS `ts_trade_cal`;
 CREATE TABLE `ts_trade_cal` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `exchange` VARCHAR(64) DEFAULT NULL COMMENT 'exchange',
   `cal_date` VARCHAR(64) DEFAULT NULL COMMENT 'cal_date',
   `is_open` VARCHAR(64) DEFAULT NULL COMMENT 'is_open',
   `pretrade_date` VARCHAR(64) DEFAULT NULL COMMENT 'pretrade_date',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取各大交易所交易日历数据,默认提取的是上交所';
 
 -- 获取A股周线行情，本接口每周最后一个交易日更新，如需要使用每天更新的周线数据，请使用
 DROP TABLE IF EXISTS `ts_weekly`;
 CREATE TABLE `ts_weekly` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `row_hash` CHAR(32) NOT NULL COMMENT 'MD5 of all field values for dedup',
   `ts_code` VARCHAR(64) NOT NULL COMMENT 'ts_code',
   `trade_date` VARCHAR(64) DEFAULT NULL COMMENT 'trade_date',
   `close` DECIMAL(20,4) DEFAULT NULL COMMENT 'close',
@@ -2748,7 +2541,6 @@ CREATE TABLE `ts_weekly` (
   `vol` INT DEFAULT NULL COMMENT 'vol',
   `amount` DECIMAL(20,4) DEFAULT NULL COMMENT 'amount',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_row_hash` (`row_hash`),
   INDEX `idx_ts_trade` (`ts_code`, `trade_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='获取A股周线行情，本接口每周最后一个交易日更新，如需要使用每天更新的周线数据，请使用';
 

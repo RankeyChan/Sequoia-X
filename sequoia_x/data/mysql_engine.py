@@ -99,6 +99,21 @@ class MySQLEngine:
             # ── 已有表：自动补齐缺失的列 ──
             self._migrate_schema(conn, existing)
 
+            # ── 迁移：删除旧版 row_hash 列（去重方案已移除）──
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT TABLE_NAME FROM information_schema.COLUMNS"
+                    " WHERE COLUMN_NAME = 'row_hash'"
+                    "   AND TABLE_SCHEMA = %s",
+                    (self.settings.mysql_database,),
+                )
+                for (tbl,) in cur.fetchall():
+                    try:
+                        cur.execute(f"ALTER TABLE `{tbl}` DROP COLUMN `row_hash`")
+                        logger.info(f"迁移: {tbl} 已删除 row_hash 列")
+                    except Exception:
+                        pass
+
             conn.close()
             logger.info("MySQL DDL 初始化完成")
         except Exception as exc:
@@ -133,7 +148,7 @@ class MySQLEngine:
                     existing_cols = {r[0]: r[1] for r in cur.fetchall()}
 
                 for col_name, col_def in ddl_cols[table].items():
-                    if col_name in ("id", "row_hash", "uk_row_hash"):
+                    if col_name == "id":
                         continue
                     if col_name not in existing_cols:
                         # 简化类型：直接取 DDL 中的列定义
@@ -152,36 +167,7 @@ class MySQLEngine:
                                 f"表 {table} 添加列 {col_name} 失败: {exc}"
                             )
 
-                # 确保 row_hash 存在
-                if "row_hash" in ddl_cols[table] and "row_hash" not in existing_cols:
-                    conn.cursor().execute(
-                        f"ALTER TABLE `{table}` ADD COLUMN `row_hash`"
-                        f" CHAR(32) NOT NULL"
-                        f" COMMENT 'MD5 of all field values for dedup'"
-                    )
-                    try:
-                        conn.cursor().execute(
-                            f"ALTER TABLE `{table}`"
-                            f" ADD UNIQUE KEY `uk_row_hash` (`row_hash`)"
-                        )
-                    except Exception:
-                        pass
-                    # 计算已有数据的 hash
-                    with conn.cursor() as cur:
-                        cur.execute(f"SHOW COLUMNS FROM `{table}`")
-                        all_cols = [r[0] for r in cur.fetchall()]
-                    data_cols = [
-                        c for c in all_cols if c not in ("id", "row_hash")
-                    ]
-                    if data_cols:
-                        parts = ", '|', ".join(
-                            f"IFNULL(`{c}`, '\\0')" for c in data_cols
-                        )
-                        conn.cursor().execute(
-                            f"UPDATE `{table}` SET `row_hash` ="
-                            f" MD5(CONCAT({parts}))"
-                        )
-                    logger.info(f"表 {table}: 已添加 row_hash 列")
+
             except Exception as exc:
                 logger.warning(f"表 {table} schema 迁移失败: {exc}")
 

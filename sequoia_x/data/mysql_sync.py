@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import date
 
 import pandas as pd
@@ -32,72 +31,33 @@ def _is_db_error(exc: Exception) -> bool:
 # ── MySQL 写入 ──
 
 
-def _compute_row_hash(values: list) -> str:
-    """计算一行所有字段值的 MD5 哈希，用于去重。"""
-    parts: list[str] = []
-    for v in values:
-        if v is None:
-            parts.append("\0")
-        else:
-            parts.append(str(v))
-    return hashlib.md5("|".join(parts).encode("utf-8")).hexdigest()
-
-
 def _write_mysql(conn: pymysql.Connection, table: str, df: pd.DataFrame) -> int:
-    """MD5 哈希去重写入 MySQL。
-
-    对每行数据计算全字段 MD5，利用 row_hash 列的 UNIQUE KEY 自动去重：
-    - 完全重复（同 hash）→ 跳过
-    - 任一字段不同（hash 不同）→ 插入新行
-
-    若表尚无 row_hash 列，自动降级为普通 INSERT。
-    """
+    """Plain INSERT，无 row_hash。"""
     if df.empty:
         return 0
-
     with conn.cursor() as cur:
         cur.execute(f"SHOW COLUMNS FROM `{table}`")
         table_cols = {r[0] for r in cur.fetchall()}
-    available = [c for c in df.columns if c in table_cols and c not in ("id", "row_hash")]
+    available = [c for c in df.columns if c in table_cols and c != "id"]
     if not available:
         return 0
-
-    has_row_hash = "row_hash" in table_cols
     sub = df[available]
-
-    # 向量化 NaN → None 转换（比 iterrows 逐行判断快 ~50x）
     import numpy as np
-    arrays = {
-        c: sub[c].to_numpy(dtype=object, na_value=None)
-        for c in available
-    }
+    arrays = {c: sub[c].to_numpy(dtype=object, na_value=None) for c in available}
     n_rows = len(sub)
-
-    # 构建 rows 列表：逐行提取但用 numpy 索引（远快于 iterrows）
-    rows: list[tuple] = []
-    if has_row_hash:
-        for i in range(n_rows):
-            vals = [arrays[c][i] for c in available]
-            h = _compute_row_hash(vals)
-            rows.append((h, *vals))
-        cols = "`row_hash`, " + ", ".join(f"`{c}`" for c in available)
-        placeholders = ", ".join(["%s"] * (1 + len(available)))
-        sql = f"INSERT IGNORE INTO `{table}` ({cols}) VALUES ({placeholders})"
-    else:
-        for i in range(n_rows):
-            rows.append(tuple(arrays[c][i] for c in available))
-        cols = ", ".join(f"`{c}`" for c in available)
-        placeholders = ", ".join(["%s"] * len(available))
-        sql = f"INSERT INTO `{table}` ({cols}) VALUES ({placeholders})"
-
+    rows = [tuple(arrays[c][i] for c in available) for i in range(n_rows)]
+    cols = ", ".join(f"`{c}`" for c in available)
+    placeholders = ", ".join(["%s"] * len(available))
+    sql = f"INSERT INTO `{table}` ({cols}) VALUES ({placeholders})"
     with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) FROM `{table}`")
+        before = cur.fetchone()[0]
         cur.executemany(sql, rows)
-    inserted = cur.rowcount if has_row_hash else len(rows)
-
-    logger.info(f"[{table}] 写入 {inserted} 行（跳过 {len(df) - inserted} 条重复）")
+        cur.execute(f"SELECT COUNT(*) FROM `{table}`")
+        after = cur.fetchone()[0]
+    inserted = after - before
+    logger.info(f"[{table}] 写入 {inserted} 行")
     return inserted
-
-
 # ══════════════════════════════════════════════════════════════════════
 # API 分类（按同步频率）
 # ══════════════════════════════════════════════════════════════════════
@@ -215,6 +175,30 @@ def _get_global_conn():
 # 同步执行器
 # ══════════════════════════════════════════════════════════════════════
 
+def _clear_trade_date(conn: pymysql.Connection, table: str, trade_date: str) -> int:
+    """按 trade_date 删除旧数据，使同步幂等。
+
+    若表无 trade_date 列（如 ts_stock_basic），静默跳过。
+    调用方确保在 INSERT 新数据前调用。
+    """
+    try:
+        with conn.cursor() as cur:
+            return cur.execute(
+                f"DELETE FROM `{table}` WHERE trade_date = %s", (trade_date,)
+            )
+    except Exception:
+        return 0
+
+
+def _clear_table(conn: pymysql.Connection, table: str) -> int:
+    """全表清理，用于无 trade_date 列的静态参考表。"""
+    try:
+        with conn.cursor() as cur:
+            return cur.execute(f"DELETE FROM `{table}`")
+    except Exception:
+        return 0
+
+
 def _sync_task_list(self, tasks: list, trade_date: str) -> dict[str, int]:
     """执行一批同步任务，返回 {table: count}。
 
@@ -237,6 +221,7 @@ def _sync_task_list(self, tasks: list, trade_date: str) -> dict[str, int]:
                 if df is not None and not df.empty:
                     if rename:
                         df = df.rename(columns=rename)
+                    _clear_trade_date(conn, table, trade_date)
                     result[table] = _write_mysql(conn, table, df)
             except Exception as exc:
                 if _is_db_error(exc):
@@ -741,6 +726,12 @@ def sync_table(self, table_name: str, trade_date: str = "") -> int:
 
     conn = self._get_conn()
     try:
+        if api_name in _POSITIONAL_APIS:
+            # 静态参考表：全表替换
+            _clear_table(conn, table_name)
+        else:
+            # 日频/财务表：按 trade_date 清理
+            _clear_trade_date(conn, table_name, trade_date)
         count = _write_mysql(conn, table_name, df)
     finally:
         conn.close()
