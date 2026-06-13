@@ -459,20 +459,6 @@ class TushareProvider:
         df["symbol"] = df["con_code"].str.extract(r"(\d{6})")
         return df
 
-    def get_ggt_top10(self, trade_date: str, market_type: str = "") -> pd.DataFrame:
-        """获取港股通十大成交股。market_type: 2=港股通(沪) 4=港股通(深)。"""
-        params = dict(trade_date=trade_date)
-        if market_type:
-            params["market_type"] = market_type
-        df = self._call("ggt_top10", **params)
-        return self._extract_symbol(df)
-
-    def get_ggt_daily(self, trade_date: str = "", start_date: str = "",
-                      end_date: str = "") -> pd.DataFrame:
-        """获取港股通每日成交统计。"""
-        params = dict(trade_date=trade_date, start_date=start_date,
-                       end_date=end_date)
-        return self._call("ggt_daily", **params)
 
     def get_limit_list_orig(self, trade_date: str = "", ts_code: str = "",
                             start_date: str = "", end_date: str = "",
@@ -536,11 +522,6 @@ class TushareProvider:
     def get_stock_hsgt(self, ts_code: str = "", trade_date: str = "") -> pd.DataFrame:
         """获取沪深港通股票列表。"""
         return self._extract_symbol(self._call("stock_hsgt", ts_code=ts_code, trade_date=trade_date))
-
-    def get_new_share(self, start_date: str = "", end_date: str = "") -> pd.DataFrame:
-        """获取IPO新股上市。"""
-        df = self._call("new_share", start_date=start_date, end_date=end_date)
-        return self._extract_symbol(df)
 
     def get_margin_secs(self, trade_date: str = "", exchange: str = "") -> pd.DataFrame:
         """获取融资融券标的。"""
@@ -645,11 +626,6 @@ class TushareProvider:
         params = dict(ts_code=ts_code, report_date=report_date,
                        start_date=start_date, end_date=end_date)
         return self._extract_symbol(self._call("report_rc", **params))
-
-    def get_index_daily(self, ts_code: str, start_date: str,
-                        end_date: str) -> pd.DataFrame:
-        return self._call("index_daily", ts_code=ts_code,
-                          start_date=start_date, end_date=end_date)
 
     def get_stk_factor_pro(
         self, ts_code: str, start_date: str, end_date: str,

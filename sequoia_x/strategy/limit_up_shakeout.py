@@ -65,20 +65,27 @@ class LimitUpShakeoutStrategy(BaseStrategy):
 
                 # 条件 1：昨日涨停
                 if limit_up_set:
-                    # Tushare 模式：使用真实涨停数据
                     limit_up_yesterday = symbol in limit_up_set
                 else:
                     # 降级模式：价格比例判断（10% 涨停）
+                    if prev2["close"] is None or pd.isna(prev2["close"]):
+                        continue
                     limit_up_yesterday = prev1["close"] >= prev2["close"] * 1.095
 
                 if not limit_up_yesterday:
                     continue
 
                 # 条件 2：今日收阴
+                if today["close"] is None or today["open"] is None:
+                    continue
                 bearish_today = today["close"] < today["open"]
                 # 条件 3：今日放量
+                if prev1["volume"] is None or pd.isna(prev1["volume"]) or today["volume"] is None:
+                    continue
                 volume_surge = today["volume"] > prev1["volume"] * 2.0
                 # 条件 4：支撑不破
+                if today["low"] is None or prev1["close"] is None:
+                    continue
                 support_hold = today["low"] >= prev1["close"]
 
                 if bearish_today and volume_surge and support_hold:

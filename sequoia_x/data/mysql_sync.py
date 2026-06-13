@@ -17,6 +17,18 @@ from sequoia_x.core.logger import get_logger
 logger = get_logger(__name__)
 
 
+# ── 错误分类 ──
+
+def _is_db_error(exc: Exception) -> bool:
+    """判断是否为数据库连接/执行错误（需要立即中止，不应重试）。"""
+    return isinstance(exc, (
+        pymysql.err.OperationalError,
+        pymysql.err.ProgrammingError,
+        pymysql.err.InternalError,
+        pymysql.err.IntegrityError,
+    ))
+
+
 # ── MySQL 写入 ──
 
 
@@ -235,7 +247,9 @@ def _sync_task_list(self, tasks: list, trade_date: str) -> dict[str, int]:
                     result[table] = _write_mysql(conn, table, df)
                 finally:
                     conn.close()
-        except Exception:
+        except Exception as exc:
+            if _is_db_error(exc):
+                raise
             pass
         _tm.sleep(0.12)
     return result
@@ -384,7 +398,10 @@ def _sync_financial(self, trade_date: str = "") -> dict[str, int]:
                     df = method(ts_code=ts_code, end_date=period)
                 else:
                     df = method(ts_code=ts_code, period=period)
-            except Exception:
+            except Exception as exc:
+                if _is_db_error(exc):
+                    logger.error(f"[财务] {api_name}: 数据库错误，停止同步: {exc}")
+                    raise
                 fail_count += 1
                 if fail_count >= 5:
                     _tm.sleep(10)

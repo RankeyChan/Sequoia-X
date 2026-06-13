@@ -70,7 +70,7 @@ class FeishuNotifier:
                 f"深证: {overview['sz_close']:.2f} ({overview.get('sz_pct', 0):+.2f}%)"
             )
         if "north_net" in overview:
-            north_b = overview["north_net"] / 1e4
+            north_b = float(overview["north_net"]) / 1e4
             parts.append(f"北向资金净流入: {north_b:.1f}亿")
 
         return " | ".join(parts) if parts else ""
