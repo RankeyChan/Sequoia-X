@@ -88,5 +88,6 @@ class SectorRotationStrategy(BaseStrategy):
                 if stock_pct.get(symbol, 0) >= industry_avg and stock_pct.get(symbol, 0) > 0:
                     selected.append(symbol)
 
+        logger.debug(f"[行业轮动] total={len(symbols)} industries={len(industry_map) if 'industry_map' in dir() else 0} top_industries={len(top_industries) if 'top_industries' in dir() else 0} selected={len(selected)}")
         logger.info(f"SectorRotationStrategy 选出 {len(selected)} 只股票")
         return selected

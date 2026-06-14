@@ -108,7 +108,10 @@ class MoneyFlowStrategy(BaseStrategy):
                     df = self.engine.get_ohlcv(symbol)
                     if len(df) < self._MIN_BARS:
                         continue
-                    vol_ma20 = df["volume"].iloc[-21:-1].mean()
+                    recent_vol = df["volume"].iloc[-21:-1].dropna()
+                    if len(recent_vol) < 10:
+                        continue
+                    vol_ma20 = recent_vol.mean()
                     volume_surge = df["volume"].iloc[-1] > vol_ma20 * 1.2
 
                     if volume_surge:
@@ -122,8 +125,9 @@ class MoneyFlowStrategy(BaseStrategy):
         if selected:
             f_filter = FundamentalFilter(self.engine)
             selected = f_filter.filter_st_stocks(selected)
-            selected = f_filter.filter_by_market_cap(selected, min_cap=10e8)
+            selected = f_filter.filter_by_market_cap(selected, min_cap_wan=100000)
             selected = f_filter.filter_by_pe(selected, max_pe=100, min_pe=0)
 
+        logger.debug(f"[主力资金] total={len(symbols)} valid_symbols={len(valid_symbols) if 'valid_symbols' in dir() else len(symbols)} before_filter={len(selected)}")
         logger.info(f"MoneyFlowStrategy 选出 {len(selected)} 只股票")
         return selected

@@ -47,11 +47,13 @@ class TurtleTradeStrategy(BaseStrategy):
         """遍历全市场，返回满足海龟突破条件的股票代码列表。"""
         symbols = self.engine.get_local_symbols()
         candidates: list[str] = []
+        _dbg = {"insufficient": 0, "no_breakout": 0, "no_liquid": 0, "no_yang": 0, "no_up": 0, "fundamental": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < self._MIN_BARS:
+                    _dbg["insufficient"] += 1
                     continue
 
                 # 向量化：前20日 high 的滚动最大值（不含当日，shift(1) 后取 rolling(20)）
@@ -73,11 +75,17 @@ class TurtleTradeStrategy(BaseStrategy):
 
                 if breakout and liquid and is_yang and is_up:
                     candidates.append(symbol)
+                else:
+                    if not breakout: _dbg["no_breakout"] += 1
+                    if not liquid: _dbg["no_liquid"] += 1
+                    if not is_yang: _dbg["no_yang"] += 1
+                    if not is_up: _dbg["no_up"] += 1
 
             except Exception as exc:
                 logger.warning(f"[{symbol}] TurtleTradeStrategy 计算失败：{exc}")
                 continue
 
+        before_f = len(candidates)
         # 基本面前置过滤
         if candidates and self.engine.tushare:
             f_filter = FundamentalFilter(self.engine)
@@ -88,5 +96,8 @@ class TurtleTradeStrategy(BaseStrategy):
             market_caps = self._get_market_caps_from_db(candidates)
             candidates.sort(key=lambda s: market_caps.get(s, 0), reverse=True)
 
+        _dbg["fundamental"] = before_f - len(candidates)
+
+        logger.debug(f"[海龟突破] total={len(symbols)} insufficient={_dbg['insufficient']} no_breakout={_dbg['no_breakout']} no_liquid={_dbg['no_liquid']} no_yang={_dbg['no_yang']} no_up={_dbg['no_up']} fundamental_dropped={_dbg['fundamental']} selected={len(candidates)}")
         logger.info(f"TurtleTradeStrategy 选出 {len(candidates)} 只股票")
         return candidates

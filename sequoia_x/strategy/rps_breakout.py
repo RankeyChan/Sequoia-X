@@ -58,5 +58,6 @@ class RpsBreakoutStrategy(BaseStrategy):
             f_filter = FundamentalFilter(self.engine)
             symbols = f_filter.apply_defaults(symbols)
 
+        logger.debug(f"[RPS突破] total={len(df['ts_code'].unique())} rps_above_threshold={len(strong_stocks)} breakout={len(selected)} fundamental_before={len(symbols)} selected={len(symbols)}")
         logger.info(f"RpsBreakoutStrategy 选出 {len(symbols)} 只股票")
         return symbols

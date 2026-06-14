@@ -72,5 +72,6 @@ class EarningsSurpriseStrategy(BaseStrategy):
             except Exception:
                 continue
 
+        logger.debug(f"[净利润断层] forecast_total={len(df)} pe_passed={len(selected)}")
         logger.info(f"EarningsSurpriseStrategy 选出 {len(selected)} 只股票")
         return selected

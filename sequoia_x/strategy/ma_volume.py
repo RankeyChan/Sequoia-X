@@ -32,17 +32,19 @@ class MaVolumeStrategy(BaseStrategy):
         """
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        _dbg = {"insufficient": 0, "no_cross": 0, "no_volume": 0, "fundamental": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < 20:
+                    _dbg["insufficient"] += 1
                     continue
 
                 # 向量化计算均线和成交量均值
                 df["ma5"] = df["close"].rolling(5).mean()
                 df["ma20"] = df["close"].rolling(20).mean()
-                df["vol_ma20"] = df["volume"].rolling(20).mean()
+                df["vol_ma20"] = df["volume"].shift(1).rolling(20).mean()
 
                 # 取最后两行判断金叉（昨日 ma5 < ma20，今日 ma5 > ma20）
                 last = df.iloc[-1]
@@ -56,15 +58,24 @@ class MaVolumeStrategy(BaseStrategy):
 
                 if golden_cross and volume_surge:
                     selected.append(symbol)
+                else:
+                    if not golden_cross:
+                        _dbg["no_cross"] += 1
+                    if not volume_surge:
+                        _dbg["no_volume"] += 1
 
             except Exception as exc:
                 logger.warning(f"[{symbol}] 策略计算失败：{exc}")
                 continue
 
         # 基本面前置过滤
+        _dbg["fundamental"] = len(selected)
         if selected and self.engine.tushare:
             f_filter = FundamentalFilter(self.engine)
+            selected_before = len(selected)
             selected = f_filter.apply_defaults(selected)
+            _dbg["fundamental"] = selected_before - len(selected)
 
+        logger.debug(f"[均线放量] total={len(symbols)} insufficient={_dbg['insufficient']} no_cross={_dbg['no_cross']} no_volume={_dbg['no_volume']} fundamental_dropped={_dbg['fundamental']} selected={len(selected)}")
         logger.info(f"MaVolumeStrategy 选出 {len(selected)} 只股票")
         return selected

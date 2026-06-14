@@ -34,17 +34,19 @@ class UptrendLimitDownStrategy(BaseStrategy):
         """
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        _dbg = {"insufficient": 0, "no_uptrend": 0, "no_limit": 0, "no_volume": 0, "fundamental": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < self._MIN_BARS:
+                    _dbg["insufficient"] += 1
                     continue
 
                 # 向量化计算均线
                 df["ma20"] = df["close"].rolling(20).mean()
                 df["ma60"] = df["close"].rolling(60).mean()
-                df["vol_ma20"] = df["volume"].rolling(20).mean()
+                df["vol_ma20"] = df["volume"].shift(1).rolling(20).mean()
 
                 prev = df.iloc[-2]  # 昨日
                 today = df.iloc[-1]  # 今日
@@ -60,6 +62,13 @@ class UptrendLimitDownStrategy(BaseStrategy):
 
                 if uptrend and limit_down and volume_surge:
                     selected.append(symbol)
+                else:
+                    if not uptrend:
+                        _dbg["no_uptrend"] += 1
+                    if not limit_down:
+                        _dbg["no_limit"] += 1
+                    if not volume_surge:
+                        _dbg["no_volume"] += 1
 
             except Exception as exc:
                 logger.warning(f"[{symbol}] UptrendLimitDownStrategy 计算失败：{exc}")
@@ -68,7 +77,10 @@ class UptrendLimitDownStrategy(BaseStrategy):
         # 基本面前置过滤
         if selected and self.engine.tushare:
             f_filter = FundamentalFilter(self.engine)
+            before = len(selected)
             selected = f_filter.apply_defaults(selected)
+            _dbg["fundamental"] = before - len(selected)
 
+        logger.debug(f"[上升跌停] total={len(symbols)} insufficient={_dbg['insufficient']} no_uptrend={_dbg['no_uptrend']} no_limit={_dbg['no_limit']} no_volume={_dbg['no_volume']} fundamental_dropped={_dbg['fundamental']} selected={len(selected)}")
         logger.info(f"UptrendLimitDownStrategy 选出 {len(selected)} 只股票")
         return selected

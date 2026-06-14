@@ -44,11 +44,13 @@ class FundamentalFilter:
         placeholders = ",".join(["%s"] * len(symbols))
         try:
             all_rows = self.engine.fetch_all(
-                f"""SELECT ts_code, pb, circ_mv, turnover_rate FROM (
-                    SELECT ts_code, pb, circ_mv, turnover_rate,
-                        ROW_NUMBER() OVER (PARTITION BY ts_code ORDER BY trade_date DESC) AS rn
+                f"""SELECT t.ts_code, t.pb, t.circ_mv, t.turnover_rate
+                FROM ts_daily_basic t
+                INNER JOIN (
+                    SELECT ts_code, MAX(trade_date) AS max_td
                     FROM ts_daily_basic WHERE ts_code IN ({placeholders})
-                ) t WHERE rn = 1""",
+                    GROUP BY ts_code
+                ) m ON t.ts_code = m.ts_code AND t.trade_date = m.max_td""",
                 symbols,
             )
             return {
@@ -56,7 +58,8 @@ class FundamentalFilter:
                 "cap": {r[0]: r[2] or 0 for r in all_rows},
                 "turn": {r[0]: r[3] or 0 for r in all_rows},
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"_get_daily_basic_batch 失败: {exc}")
             return {"pb": {}, "cap": {}, "turn": {}}
 
     def _get_st_stocks(self) -> set[str]:
@@ -95,12 +98,12 @@ class FundamentalFilter:
         return result
 
     def filter_by_market_cap(
-        self, symbols: list[str], min_cap: float = 10e8
+        self, symbols: list[str], min_cap_wan: float = 100000
     ) -> list[str]:
         """按流通市值过滤（默认最小 10 亿）。"""
         cap_map = self._get_daily_basic_batch(symbols)["cap"]
-        result = [s for s in symbols if s in cap_map and cap_map[s] >= min_cap]
-        logger.info(f"市值过滤: {len(symbols)} -> {len(result)} (≥{min_cap / 1e8:.0f}亿)")
+        result = [s for s in symbols if s in cap_map and cap_map[s] >= min_cap_wan]
+        logger.info(f"市值过滤: {len(symbols)} -> {len(result)} (≥{min_cap_wan / 1e4:.0f}亿)")
         return result
 
     def filter_by_turnover_rate(
@@ -137,7 +140,7 @@ class FundamentalFilter:
         if not symbols:
             return []
         result = self.filter_st_stocks(symbols)
-        result = self.filter_by_market_cap(result, min_cap=10e8)
+        result = self.filter_by_market_cap(result, min_cap_wan=100000)
         result = self.filter_by_pe(result, max_pe=300, min_pe=0)
         logger.info(f"默认基本面过滤: {len(symbols)} -> {len(result)}")
         return result

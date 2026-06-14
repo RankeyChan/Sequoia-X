@@ -154,5 +154,6 @@ class SectorMomentumStrategy(BaseStrategy):
 
                 selected.append(symbol)
 
+        logger.debug(f"[行业动量] total={len(symbols)} stock_pct={len(stock_pct) if 'stock_pct' in dir() else 0} industries={len(industry_map) if 'industry_map' in dir() else 0} selected={len(selected)}")
         logger.info(f"SectorMomentumStrategy 选出 {len(selected)} 只股票")
         return selected

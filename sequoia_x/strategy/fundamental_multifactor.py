@@ -29,9 +29,11 @@ class FundamentalMultifactorStrategy(BaseStrategy):
 
     def run(self) -> list[str]:
         try:
-            # 最新报告期
+            target = self.engine.target_date or dt.today().strftime("%Y%m%d")
+            # 报告期不超过 target_date 的最新财报
             end_date = self.engine.fetch_one(
-                "SELECT MAX(end_date) FROM ts_fina_indicator"
+                "SELECT MAX(end_date) FROM ts_fina_indicator WHERE end_date <= %s",
+                (target,),
             )
             if not end_date:
                 logger.info("FundamentalMultifactor: fina_indicator 无数据")
@@ -62,7 +64,10 @@ class FundamentalMultifactorStrategy(BaseStrategy):
 
         # PE 打分（取最近一个交易日的 PE）
         try:
-            latest_date = self.engine.fetch_one("SELECT MAX(trade_date) FROM ts_daily_basic")
+            latest_date = self.engine.fetch_one(
+                "SELECT MAX(trade_date) FROM ts_daily_basic WHERE trade_date <= %s",
+                (target,),
+            )
             if latest_date:
                 pe_df = self.engine.query(
                     f"""
@@ -87,5 +92,6 @@ class FundamentalMultifactorStrategy(BaseStrategy):
         df = df.sort_values("total", ascending=False)
 
         selected = df.head(self._TOP_N)["ts_code"].tolist()
+        logger.debug(f"[基本面多因子] fina_total={len(df)} with_pe={len(df) if 'pe_score' in df.columns else 'N/A'} selected={len(selected)}")
         logger.info(f"FundamentalMultifactorStrategy 选出 {len(selected)} 只股票")
         return selected

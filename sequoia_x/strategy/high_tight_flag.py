@@ -34,11 +34,13 @@ class HighTightFlagStrategy(BaseStrategy):
         """
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        _dbg = {"insufficient": 0, "no_momentum": 0, "no_consolidation": 0, "no_level": 0, "no_shrink": 0, "fundamental": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < self._MIN_BARS:
+                    _dbg["insufficient"] += 1
                     continue
 
                 # 向量化计算各窗口指标
@@ -60,11 +62,20 @@ class HighTightFlagStrategy(BaseStrategy):
                 # 条件 3：高位抗跌（近10天最低点不得低于40天最高点的80%）
                 high_level = low10 >= high40 * 0.8
                 # 条件 4：缩量（向量化均值）
-                vol_ma20 = df["volume"].iloc[-21:-1].mean()
+                recent_vol = df["volume"].iloc[-21:-1].dropna()
+                if len(recent_vol) < 10:
+                    _dbg["no_shrink"] += 1
+                    continue
+                vol_ma20 = recent_vol.mean()
                 shrink = df["volume"].iloc[-1] < vol_ma20 * 0.6
 
                 if momentum and consolidation and high_level and shrink:
                     selected.append(symbol)
+                else:
+                    if not momentum: _dbg["no_momentum"] += 1
+                    if not consolidation: _dbg["no_consolidation"] += 1
+                    if not high_level: _dbg["no_level"] += 1
+                    if not shrink: _dbg["no_shrink"] += 1
 
             except Exception as exc:
                 logger.warning(f"[{symbol}] HighTightFlagStrategy 计算失败：{exc}")
@@ -73,7 +84,10 @@ class HighTightFlagStrategy(BaseStrategy):
         # 基本面前置过滤
         if selected and self.engine.tushare:
             f_filter = FundamentalFilter(self.engine)
+            before = len(selected)
             selected = f_filter.apply_defaults(selected)
+            _dbg["fundamental"] = before - len(selected)
 
+        logger.debug(f"[高窄旗形] total={len(symbols)} insufficient={_dbg['insufficient']} no_momentum={_dbg['no_momentum']} no_consolidation={_dbg['no_consolidation']} no_level={_dbg['no_level']} no_shrink={_dbg['no_shrink']} fundamental_dropped={_dbg['fundamental']} selected={len(selected)}")
         logger.info(f"HighTightFlagStrategy 选出 {len(selected)} 只股票")
         return selected

@@ -28,8 +28,10 @@ class HighDividendStrategy(BaseStrategy):
             return []
 
         try:
+            target = self.engine.target_date or dt.today().strftime("%Y%m%d")
             latest = self.engine.fetch_one(
-                "SELECT MAX(trade_date) FROM ts_daily_basic"
+                "SELECT MAX(trade_date) FROM ts_daily_basic WHERE trade_date <= %s",
+                (target,),
             )
             if not latest:
                 return []
@@ -47,7 +49,7 @@ class HighDividendStrategy(BaseStrategy):
             return []
 
         df = df.dropna(subset=["dv_ratio", "pe_ttm", "circ_mv"])
-        df = df[(df["pe_ttm"] > 0) & (df["dv_ratio"] > 0) & (df["circ_mv"] >= 50e8)]
+        df = df[(df["pe_ttm"] > 0) & (df["dv_ratio"] > 0) & (df["circ_mv"] >= 500000)]
 
         if df.empty:
             return []
@@ -60,9 +62,34 @@ class HighDividendStrategy(BaseStrategy):
         pe_threshold = df["pe_ttm"].quantile(0.40)
         df = df[df["pe_ttm"] <= pe_threshold]
 
+        # 近 60 日波动率过滤（低波动）
+        # 从 ts_daily 批量获取所有候选股的近 60 日收益率，计算波动率
+        try:
+            vol_placeholders = ",".join(["%s"] * len(df))
+            vol_rows = self.engine.fetch_all(
+                f"""SELECT ts_code, trade_date, close FROM ts_daily
+                WHERE ts_code IN ({vol_placeholders})
+                ORDER BY ts_code, trade_date""",
+                df["ts_code"].tolist(),
+            )
+            import pandas as pd
+            vol_df = pd.DataFrame(vol_rows, columns=["ts_code", "trade_date", "close"])
+            if not vol_df.empty:
+                vol_df["ret"] = vol_df.groupby("ts_code")["close"].pct_change()
+                # 只取近 60 个交易日
+                vol_df = vol_df.groupby("ts_code").tail(60)
+                vol_std = vol_df.groupby("ts_code")["ret"].std().dropna()
+                if not vol_std.empty:
+                    median_vol = vol_std.median()
+                    low_vol_codes = set(vol_std[vol_std <= median_vol].index)
+                    df = df[df["ts_code"].isin(low_vol_codes)]
+        except Exception:
+            pass  # 波动率计算失败不影响其他条件
+
         # 按股息率排序
         df = df.sort_values("dv_ratio", ascending=False)
 
         selected = df.head(20)["ts_code"].tolist()
+        logger.debug(f"[高股息红利] basic_total={len(df)} after_dv={len(df) if 'dv_threshold' in dir() else len(df)} selected={len(selected)}")
         logger.info(f"HighDividendStrategy 选出 {len(selected)} 只股票")
         return selected

@@ -34,11 +34,11 @@ class LimitUpShakeoutStrategy(BaseStrategy):
 
     def _get_limit_up_symbols(self) -> set[str]:
         """从 limit_list 表获取昨日真实涨停的股票列表。"""
-        yesterday = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
+        td = self.engine.target_date or date.today().strftime("%Y%m%d")
         try:
             rows = self.engine.fetch_all(
                 "SELECT ts_code FROM ts_limit_list_d WHERE trade_date = %s AND limit_type = 'U'",
-                (yesterday,),
+                (td,),
             )
             return {r[0] for r in rows}
         except Exception:
@@ -100,5 +100,6 @@ class LimitUpShakeoutStrategy(BaseStrategy):
             f_filter = FundamentalFilter(self.engine)
             selected = f_filter.apply_defaults(selected)
 
+        logger.debug(f"[涨停洗盘] total={len(symbols)} limit_up_set={len(limit_up_set) if 'limit_up_set' in dir() else 0} before_filter={len(selected)}")
         logger.info(f"LimitUpShakeoutStrategy 选出 {len(selected)} 只股票")
         return selected

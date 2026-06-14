@@ -96,7 +96,7 @@ class InstitutionalStrategy(BaseStrategy):
         for symbol in candidates:
             try:
                 df = self.engine.get_ohlcv(symbol)
-                if len(df) < 5:
+                if len(df) < 6:
                     continue
                 pct_5d = (df["close"].iloc[-1] / df["close"].iloc[-6] - 1) * 100
                 if pct_5d < 15:
@@ -108,8 +108,9 @@ class InstitutionalStrategy(BaseStrategy):
         if selected:
             f_filter = FundamentalFilter(self.engine)
             selected = f_filter.filter_st_stocks(selected)
-            selected = f_filter.filter_by_market_cap(selected, min_cap=20e8)
+            selected = f_filter.filter_by_market_cap(selected, min_cap_wan=200000)
             selected = f_filter.filter_by_pe(selected, max_pe=200, min_pe=0)
 
+        logger.debug(f"[机构追踪] total={len(symbols)} inst_buys={len(inst_buys) if 'inst_buys' in dir() else 0} surv_stocks={len(surv_stocks) if 'surv_stocks' in dir() else 0} before_filter={len(selected)}")
         logger.info(f"InstitutionalStrategy 选出 {len(selected)} 只股票")
         return selected

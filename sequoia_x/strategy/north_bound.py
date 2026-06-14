@@ -112,7 +112,8 @@ class NorthBoundStrategy(BaseStrategy):
         if selected:
             f_filter = FundamentalFilter(self.engine)
             selected = f_filter.filter_st_stocks(selected)
-            selected = f_filter.filter_by_market_cap(selected, min_cap=50e8)
+            selected = f_filter.filter_by_market_cap(selected, min_cap_wan=500000)
 
+        logger.debug(f"[北向资金] total={len(symbols)} valid={len(valid_symbols) if 'valid_symbols' in dir() else len(symbols)} no_ratio={None} no_slope={None} before_filter={len(selected)}")
         logger.info(f"NorthBoundStrategy 选出 {len(selected)} 只股票")
         return selected

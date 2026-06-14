@@ -58,7 +58,8 @@ class NorthBoundMoneyStrategy(BaseStrategy):
                 if len(rows) < self._LOOKBACK_DAYS:
                     continue
 
-                ratios = np.array([r[1] for r in rows if r[1] is not None], dtype=float)
+                # 反转为时间升序（最旧→最新），确保 slope 方向正确
+                ratios = np.array([r[1] for r in reversed(rows) if r[1] is not None], dtype=float)
                 if len(ratios) < self._LOOKBACK_DAYS or np.any(np.isnan(ratios)):
                     continue
 
@@ -82,5 +83,6 @@ class NorthBoundMoneyStrategy(BaseStrategy):
             except Exception:
                 continue
 
+        logger.debug(f"[北向增持] total_stocks={len(stock_symbols) if 'stock_symbols' in dir() else 'N/A'} selected={len(selected)}")
         logger.info(f"NorthBoundMoneyStrategy 选出 {len(selected)} 只股票")
         return selected

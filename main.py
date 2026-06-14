@@ -32,7 +32,6 @@ from sequoia_x.strategy.limit_up_shakeout import LimitUpShakeoutStrategy
 from sequoia_x.strategy.ma_volume import MaVolumeStrategy
 from sequoia_x.strategy.money_flow import MoneyFlowStrategy
 from sequoia_x.strategy.north_bound import NorthBoundStrategy
-from sequoia_x.strategy.private_placement import PrivatePlacementStrategy
 from sequoia_x.strategy.rps_breakout import RpsBreakoutStrategy
 from sequoia_x.strategy.turtle_trade import TurtleTradeStrategy
 from sequoia_x.strategy.uptrend_limit_down import UptrendLimitDownStrategy
@@ -45,6 +44,7 @@ from sequoia_x.strategy.high_dividend import HighDividendStrategy
 from sequoia_x.strategy.sector_rotation import SectorRotationStrategy
 from sequoia_x.strategy.volume_drawdown import VolumeDrawdownStrategy
 from sequoia_x.strategy.fundamental_multifactor import FundamentalMultifactorStrategy
+from sequoia_x.strategy.nine_turn import NineTurnStrategy
 from sequoia_x.strategy.sector_momentum import SectorMomentumStrategy
 
 
@@ -158,7 +158,6 @@ def main() -> None:
             NorthBoundStrategy(engine=engine, settings=settings),
             InstitutionalStrategy(engine=engine, settings=settings),
             # 事件驱动（1个）
-            PrivatePlacementStrategy(engine=engine, settings=settings),
             # 新增策略（8个）
             PeRoeValueStrategy(engine=engine, settings=settings),
             EarningsSurpriseStrategy(engine=engine, settings=settings),
@@ -168,6 +167,7 @@ def main() -> None:
             SectorRotationStrategy(engine=engine, settings=settings),
             SectorMomentumStrategy(engine=engine, settings=settings),
             VolumeDrawdownStrategy(engine=engine, settings=settings),
+            NineTurnStrategy(engine=engine, settings=settings),
             FundamentalMultifactorStrategy(engine=engine, settings=settings),
         ]
 

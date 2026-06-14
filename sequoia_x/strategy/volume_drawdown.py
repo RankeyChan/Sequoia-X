@@ -29,11 +29,13 @@ class VolumeDrawdownStrategy(BaseStrategy):
     def run(self) -> list[str]:
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        _dbg = {"insufficient": 0, "no_trend": 0, "no_slope": 0, "no_ratio": 0, "no_volume": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < self._MIN_BARS:
+                    _dbg["insufficient"] += 1
                     continue
 
                 close = df["close"].astype(float)
@@ -52,22 +54,30 @@ class VolumeDrawdownStrategy(BaseStrategy):
 
                 # 条件 1：多头趋势
                 if not (last_ma20 > last_ma60):
+                    _dbg["no_trend"] += 1
                     continue
 
                 # 条件 2：MA20 向上
                 if ma20_slope <= 0:
+                    _dbg["no_slope"] += 1
                     continue
 
                 # 条件 3：收盘价在 MA20 上方 3% 以内
                 ratio = last_close / last_ma20 - 1
                 if not (0 <= ratio <= 0.03):
+                    _dbg["no_ratio"] += 1
                     continue
 
                 # 条件 4：缩量到 20 日均量 0.7 倍以下
-                vol_ma20 = volume.iloc[-21:-1].mean()
+                recent_vol = volume.iloc[-21:-1].dropna()
+                if len(recent_vol) < 10:
+                    _dbg["no_volume"] += 1
+                    continue
+                vol_ma20 = recent_vol.mean()
                 if pd.isna(vol_ma20) or vol_ma20 == 0:
                     continue
                 if not (float(last["volume"]) < vol_ma20 * 0.7):
+                    _dbg["no_volume"] += 1
                     continue
 
                 selected.append(symbol)
@@ -76,5 +86,6 @@ class VolumeDrawdownStrategy(BaseStrategy):
                 logger.warning(f"[{symbol}] VolumeDrawdown 失败: {exc}")
                 continue
 
+        logger.debug(f"[缩量回踩] total={len(symbols)} insufficient={_dbg['insufficient']} no_trend={_dbg['no_trend']} no_slope={_dbg['no_slope']} no_ratio={_dbg['no_ratio']} no_volume={_dbg['no_volume']} selected={len(selected)}")
         logger.info(f"VolumeDrawdownStrategy 选出 {len(selected)} 只股票")
         return selected

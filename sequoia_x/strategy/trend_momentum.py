@@ -35,11 +35,13 @@ class TrendMomentumStrategy(BaseStrategy):
     def run(self) -> list[str]:
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        _dbg = {"insufficient": 0, "no_arrange": 0, "no_rsi": 0, "no_ret": 0}
 
         for symbol in symbols:
             try:
                 df = self.engine.get_ohlcv(symbol)
                 if len(df) < self._MIN_BARS:
+                    _dbg["insufficient"] += 1
                     continue
 
                 close = df["close"]
@@ -55,17 +57,20 @@ class TrendMomentumStrategy(BaseStrategy):
 
                 # 条件 1：多头排列
                 if not (last5 > last20 > last60):
+                    _dbg["no_arrange"] += 1
                     continue
 
                 # 条件 2：RSI
                 rsi = self._compute_rsi(close)
                 last_rsi = rsi.iloc[-1]
                 if pd.isna(last_rsi) or not (50 <= last_rsi <= 80):
+                    _dbg["no_rsi"] += 1
                     continue
 
                 # 条件 3：近 20 日涨幅
                 ret_20d = close.iloc[-1] / close.iloc[-21] - 1
                 if not (0.05 <= ret_20d <= 0.30):
+                    _dbg["no_ret"] += 1
                     continue
 
                 selected.append(symbol)
@@ -74,5 +79,6 @@ class TrendMomentumStrategy(BaseStrategy):
                 logger.warning(f"[{symbol}] TrendMomentum 失败: {exc}")
                 continue
 
+        logger.debug(f"[趋势动量] total={len(symbols)} insufficient={_dbg['insufficient']} no_arrange={_dbg['no_arrange']} no_rsi={_dbg['no_rsi']} no_ret={_dbg['no_ret']} selected={len(selected)}")
         logger.info(f"TrendMomentumStrategy 选出 {len(selected)} 只股票")
         return selected
